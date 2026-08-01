@@ -7,8 +7,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: huggingface/hub-sync@v0.1.0
         with:
-          github_repo_id: ${{ github.repository }}
-          huggingface_repo_id: JohnBiiKibet/unique-mail-sender-in-bulk
-          hf_token: ${{ secrets.HF_TOKEN }}
+          fetch-depth: 0
+      - name: Push to Hub
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git remote add hf https://JohnBiiKibet:$HF_TOKEN@huggingface.co/spaces/JohnBiiKibet/unique-mail-sender-in-bulk
+          git push --force hf main
