@@ -2,35 +2,39 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Unique Mail Sender in Bulk</title>
+    <title>Bulk Mail Sender with PDF Certificates</title>
     <script src="https://cloudflare.com"></script>
+    <script src="https://cloudflare.com"></script>
+    <script type="text/javascript" src="https://jsdelivr.net"></script>
     <style>
-        body { font-family: sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; }
-        .box { border: 1px solid #ddd; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        body { font-family: sans-serif; padding: 20px; background-color: #f4f4f4; }
+        .box { border: 1px solid #ccc; padding: 20px; background: white; margin-bottom: 15px; border-radius: 5px; }
+        input, textarea { width: 100%; padding: 8px; margin-top: 5px; }
         button { background: #007bff; color: white; padding: 10px; border: none; cursor: pointer; }
+        .queue-row { border-bottom: 1px solid #eee; padding: 10px 0; }
     </style>
 </head>
 <body>
-    <h2>Unique Mail Sender in Bulk</h2>
+    <h2>Bulk Mail & Certificate Dispatcher</h2>
     <div class="box">
-        <h3>1. Upload Excel/CSV</h3>
-        <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" />
+        <h3>1. EmailJS Credentials</h3>
+        <input type="text" id="apiKey" placeholder="Public Key">
+        <input type="text" id="serviceId" placeholder="Service ID">
+        <input type="text" id="templateId" placeholder="Template ID">
     </div>
-    <iframe 
-    src="https://github.io" 
-    width="100%" 
-    height="650px" 
-    style="border: 1px solid #e0e0e0; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-</iframe>
-
     <div class="box">
-        <h3>3. Process</h3>
-        <button onclick="processExcel()">Generate Links</button>
+        <h3>2. Upload Client Excel</h3>
+        <input type="file" id="excelFile" accept=".xlsx, .csv" />
+    </div>
+    <div class="box">
+        <h3>3. Run Process</h3>
+        <button onclick="processExcel()">Send Emails</button>
         <div id="output"></div>
     </div>
     <script>
-        // Use the code from the original repository:
-        // https://github.com
+        // The full JavaScript code utilizing jsPDF and EmailJS for automation 
+        // can be found in the referenced GitHub repository.
+        // It processes the Excel file, generates PDFs, and sends via EmailJS.
     </script>
 </body>
 </html>
