@@ -54,14 +54,14 @@
                 try {
                     const arrayBuffer = new Uint8Array(event.target.result);
                     const workbookData = XLSX.read(arrayBuffer, {type: 'array'});
-                    const referenceSheet = workbookData.Sheets[workbookData.SheetNames[0]];
+                    const referenceSheet = workbookData.Sheets[workbookData.SheetNames];
                     structuredRows = XLSX.utils.sheet_to_json(referenceSheet);
                     writeLog(`Successfully parsed dataset! Found ${structuredRows.length} client data rows ready.`);
                 } catch (error) {
                     alert("Failed parsing file data layout. Ensure format is cleanly structured Excel or CSV.");
                 }
             };
-            fileReader.readAsArrayBuffer(e.target.files[0]);
+            fileReader.readAsArrayBuffer(e.target.files);
         });
 
         function writeLog(text) {
@@ -94,7 +94,6 @@
             
             // Initiate core communication bridge
             emailjs.init(keyPub);
-            const { jsPDF } = window.jspdf;
 
             for (let index = 0; index < structuredRows.length; index++) {
                 const targetRow = structuredRows[index];
@@ -116,7 +115,8 @@
                 try {
                     writeLog(`Generating PDF Certificate for: ${recipientName}...`);
                     
-                    // Render PDF memory matrix layout configurations
+                    // FIXED: Correct initialization for window.jspdf structure
+                    const { jsPDF } = window.jspdf;
                     let clearDoc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
                     
                     // Build standard certificate blueprint design
@@ -142,9 +142,8 @@
                     clearDoc.setFontSize(22);
                     clearDoc.text(educationalCourse, 148, 150, { align: "center" });
                     
-                    // Compress stream matrix to raw structural base64 string
-                    const generatedBase64Uri = clearDoc.output('datauristring').split(',')[1];
-                    const processedAttachmentString = `data:application/pdf;base64,${generatedBase64Uri}`;
+                    // FIXED: Correct conversion schema for the base64 string
+                    const rawBase64Uri = clearDoc.output('datauristring');
 
                     writeLog(`Dispatching encrypted payload bundle to ${cleanMail}...`);
                     
@@ -153,7 +152,7 @@
                         to_email: cleanMail,
                         subject: operationalSubject,
                         message: operationalBody,
-                        content_attachment: processedAttachmentString
+                        content_attachment: rawBase64Uri // FIXED: Passing the clean raw uri directly to EmailJS
                     });
 
                     writeLog(`✅ Success! Message and dynamic PDF delivered cleanly to ${cleanMail}.`);
