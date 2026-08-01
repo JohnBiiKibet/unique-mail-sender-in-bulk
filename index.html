@@ -4,21 +4,168 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bulk Mail System</title>
-    <!-- CDN Engines for Excel and PDF -->
+    <!-- Core External Libraries for Processing Excel, PDFs, and Emails -->
+    <script src="https://jsdelivr.net"></script>
     <script src="https://jsdelivr.net"></script>
     <script src="https://jsdelivr.net"></script>
     <style>
-        body { font-family: sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; }
-        input, button { width: 100%; padding: 10px; margin-top: 10px; }
+        body { font-family: system-ui, sans-serif; max-width: 650px; margin: 30px auto; padding: 20px; background-color: #f9f9f9; color: #333; }
+        .box { border: 1px solid #ddd; padding: 20px; border-radius: 8px; background: white; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        input, textarea, button { width: 100%; padding: 12px; margin-top: 8px; box-sizing: border-box; border-radius: 6px; border: 1px solid #ccc; font-size: 15px; }
+        textarea { height: 100px; font-family: inherit; }
+        button { background: #28a745; color: white; border: none; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        button:hover { background: #218838; }
+        .status-log { font-family: monospace; background: #222; color: #00ff00; padding: 15px; margin-top: 15px; border-radius: 6px; max-height: 200px; overflow-y: auto; display: none; }
     </style>
 </head>
 <body>
-    <h2>Email & Certificate Sender</h2>
-    <input type="file" id="excelFile" accept=".xlsx, .csv" />
-    <button onclick="processData()">Send</button>
+
+    <h2>Bulk Mail & Certificate System</h2>
+    
+    <div class="box">
+        <h3>1. Connect API (EmailJS Configuration)</h3>
+        <input type="text" id="publicKey" placeholder="Public API Key">
+        <input type="text" id="serviceId" placeholder="Email Service ID (e.g., service_gmail)">
+        <input type="text" id="templateId" placeholder="Email Template ID">
+    </div>
+
+    <div class="box">
+        <h3>2. Formulate Layout Templates</h3>
+        <label><strong>Subject Line:</strong></label>
+        <input type="text" id="emailSubject" value="Official Certificate for {Course}">
+        <label style="display:block; margin-top:12px;"><strong>Message Body:</strong></label>
+        <textarea id="emailTemplate">Dear {Name},&#10;&#10;Congratulations! Your custom digital certificate for finishing your {Course} program is successfully compiled and attached below as a PDF document.&#10;&#10;Warm regards,&#10;Management</textarea>
+    </div>
+
+    <div class="box">
+        <h3>3. Import Spreadsheet & Send</h3>
+        <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" />
+        <button id="submitBtn" onclick="dispatchBulkEmails()">Execute Automation Blast</button>
+        <div id="statusLog" class="status-log"></div>
+    </div>
+
     <script>
-        // Placeholder for core processing logic
-        // This script requires EmailJS and PDF generation handling
+        let structuredRows = [];
+
+        // Dynamic Document Scanner Engine
+        document.getElementById('excelFile').addEventListener('change', function(e) {
+            const fileReader = new FileReader();
+            fileReader.onload = function(event) {
+                try {
+                    const arrayBuffer = new Uint8Array(event.target.result);
+                    const workbookData = XLSX.read(arrayBuffer, {type: 'array'});
+                    const referenceSheet = workbookData.Sheets[workbookData.SheetNames[0]];
+                    structuredRows = XLSX.utils.sheet_to_json(referenceSheet);
+                    writeLog(`Successfully parsed dataset! Found ${structuredRows.length} client data rows ready.`);
+                } catch (error) {
+                    alert("Failed parsing file data layout. Ensure format is cleanly structured Excel or CSV.");
+                }
+            };
+            fileReader.readAsArrayBuffer(e.target.files[0]);
+        });
+
+        function writeLog(text) {
+            const consolePanel = document.getElementById('statusLog');
+            consolePanel.style.display = "block";
+            consolePanel.innerHTML += `<div>[${new Date().toLocaleTimeString()}] ${text}</div>`;
+            consolePanel.scrollTop = consolePanel.scrollHeight;
+        }
+
+        // Automated Processing Pipeline Loop
+        async function dispatchBulkEmails() {
+            const keyPub = document.getElementById('publicKey').value.trim();
+            const idServ = document.getElementById('serviceId').value.trim();
+            const idTemp = document.getElementById('templateId').value.trim();
+            const subjectBase = document.getElementById('emailSubject').value;
+            const messageBase = document.getElementById('emailTemplate').value;
+
+            if (!keyPub || !idServ || !idTemp) {
+                alert("Please complete Section 1 with your EmailJS tracking parameter dashboard keys.");
+                return;
+            }
+            if (structuredRows.length === 0) {
+                alert("Please attach your client database sheet first before executing.");
+                return;
+            }
+
+            const actionBtn = document.getElementById('submitBtn');
+            actionBtn.disabled = true;
+            actionBtn.innerText = "Processing Emails... Please Wait";
+            
+            // Initiate core communication bridge
+            emailjs.init(keyPub);
+            const { jsPDF } = window.jspdf;
+
+            for (let index = 0; index < structuredRows.length; index++) {
+                const targetRow = structuredRows[index];
+                
+                // Identify destination address case-insensitively 
+                let cleanMail = targetRow['Email'] || targetRow['email'] || targetRow['EMAIL'] || "";
+                let recipientName = targetRow['Name'] || targetRow['name'] || "Valued Recipient";
+                let educationalCourse = targetRow['Course'] || targetRow['course'] || "Program Training";
+
+                if (!cleanMail) {
+                    writeLog(`⚠️ Row ${index + 1} skipped: Missing value under email columns.`);
+                    continue;
+                }
+
+                // Swap placeholders dynamically
+                let operationalSubject = subjectBase.replaceAll('{Name}', recipientName).replaceAll('{Course}', educationalCourse);
+                let operationalBody = messageBase.replaceAll('{Name}', recipientName).replaceAll('{Course}', educationalCourse);
+
+                try {
+                    writeLog(`Generating PDF Certificate for: ${recipientName}...`);
+                    
+                    // Render PDF memory matrix layout configurations
+                    let clearDoc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+                    
+                    // Build standard certificate blueprint design
+                    clearDoc.setLineWidth(2);
+                    clearDoc.rect(10, 10, 277, 190); 
+                    clearDoc.setFont("helvetica", "bold");
+                    clearDoc.setFontSize(32);
+                    clearDoc.text("CERTIFICATE OF COMPLETION", 148, 50, { align: "center" });
+                    
+                    clearDoc.setFont("helvetica", "normal");
+                    clearDoc.setFontSize(16);
+                    clearDoc.text("This document is proudly presented to", 148, 85, { align: "center" });
+                    
+                    clearDoc.setFont("times", "italic");
+                    clearDoc.setFontSize(28);
+                    clearDoc.text(recipientName, 148, 105, { align: "center" });
+                    
+                    clearDoc.setFont("helvetica", "normal");
+                    clearDoc.setFontSize(16);
+                    clearDoc.text(`for successfully completing the specialized training curriculum in:`, 148, 130, { align: "center" });
+                    
+                    clearDoc.setFont("helvetica", "bold");
+                    clearDoc.setFontSize(22);
+                    clearDoc.text(educationalCourse, 148, 150, { align: "center" });
+                    
+                    // Compress stream matrix to raw structural base64 string
+                    const generatedBase64Uri = clearDoc.output('datauristring').split(',')[1];
+                    const processedAttachmentString = `data:application/pdf;base64,${generatedBase64Uri}`;
+
+                    writeLog(`Dispatching encrypted payload bundle to ${cleanMail}...`);
+                    
+                    // Fire network requests across API channels
+                    await emailjs.send(idServ, idTemp, {
+                        to_email: cleanMail,
+                        subject: operationalSubject,
+                        message: operationalBody,
+                        content_attachment: processedAttachmentString
+                    });
+
+                    writeLog(`✅ Success! Message and dynamic PDF delivered cleanly to ${cleanMail}.`);
+                } catch (transmissionError) {
+                    writeLog(`❌ Transmission Failure at ${cleanMail}: ${transmissionError.text || transmissionError}`);
+                }
+            }
+
+            writeLog("🎉 Complete! Full bulk queue task finished.");
+            actionBtn.disabled = false;
+            actionBtn.innerText = "Execute Automation Blast";
+        }
     </script>
 </body>
 </html>
