@@ -13,5 +13,5 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git remote add hf https://JohnBiiKibet:$HF_TOKEN@huggingface.co/spaces/JohnBiiKibet/unique-mail-sender-in-bulk
+          git remote add hf https://johnboscokibet:$HF_TOKEN@huggingface.co/spaces/johnboscokibet/unique-mail-sender-in-bulk
           git push --force hf main
