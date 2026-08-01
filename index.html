@@ -2,39 +2,69 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Bulk Mail Sender with PDF Certificates</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulk Mail Sender</title>
+    <!-- Core External Libraries for Excel, PDF, and Email -->
     <script src="https://cloudflare.com"></script>
     <script src="https://cloudflare.com"></script>
-    <script type="text/javascript" src="https://jsdelivr.net"></script>
+    <script src="https://jsdelivr.net"></script>
     <style>
-        body { font-family: sans-serif; padding: 20px; background-color: #f4f4f4; }
-        .box { border: 1px solid #ccc; padding: 20px; background: white; margin-bottom: 15px; border-radius: 5px; }
-        input, textarea { width: 100%; padding: 8px; margin-top: 5px; }
-        button { background: #007bff; color: white; padding: 10px; border: none; cursor: pointer; }
-        .queue-row { border-bottom: 1px solid #eee; padding: 10px 0; }
+        body { font-family: sans-serif; max-width: 700px; margin: 20px auto; padding: 20px; }
+        .box { border: 1px solid #ccc; padding: 15px; border-radius: 5px; margin-bottom: 15px; }
+        input, textarea { width: 100%; padding: 8px; margin-top: 5px; box-sizing: border-box; }
+        button { background: #28a745; color: white; padding: 10px; border: none; width: 100%; cursor: pointer; }
+        .log { font-family: monospace; background: #333; color: #0f0; padding: 10px; margin-top: 10px; display: none; }
     </style>
 </head>
 <body>
-    <h2>Bulk Mail & Certificate Dispatcher</h2>
+    <h2>Bulk Mail & Certificate System</h2>
     <div class="box">
         <h3>1. EmailJS Credentials</h3>
-        <input type="text" id="apiKey" placeholder="Public Key">
+        <input type="text" id="publicKey" placeholder="Public Key">
         <input type="text" id="serviceId" placeholder="Service ID">
         <input type="text" id="templateId" placeholder="Template ID">
     </div>
     <div class="box">
-        <h3>2. Upload Client Excel</h3>
-        <input type="file" id="excelFile" accept=".xlsx, .csv" />
+        <h3>2. Email Settings</h3>
+        <input type="text" id="emailSubject" value="Certificate for {Course}">
+        <textarea id="emailTemplate">Dear {Name}, congrats on completing {Course}.</textarea>
     </div>
     <div class="box">
-        <h3>3. Run Process</h3>
-        <button onclick="processExcel()">Send Emails</button>
-        <div id="output"></div>
+        <h3>3. Upload & Send</h3>
+        <input type="file" id="excelFile" accept=".xlsx" />
+        <button onclick="sendBulkEmails()">Send</button>
+        <div id="log" class="log"></div>
     </div>
     <script>
-        // The full JavaScript code utilizing jsPDF and EmailJS for automation 
-        // can be found in the referenced GitHub repository.
-        // It processes the Excel file, generates PDFs, and sends via EmailJS.
+        let excelRows = [];
+        document.getElementById('excelFile').addEventListener('change', (e) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                excelRows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                alert("Loaded " + excelRows.length + " rows.");
+            };
+            reader.readAsArrayBuffer(e.target.files[0]);
+        });
+        async function sendBulkEmails() {
+            const [pubKey, srvId, tempId] = [document.getElementById('publicKey').value, document.getElementById('serviceId').value, document.getElementById('templateId').value];
+            emailjs.init(pubKey);
+            const { jsPDF } = window.jspdf;
+            for (let row of excelRows) {
+                let doc = new jsPDF();
+                doc.text(`Certificate for ${row.Name || 'User'}`, 20, 20);
+                const base64Pdf = doc.output('datauristring').split(',')[1];
+                await emailjs.send(srvId, tempId, {
+                    to_email: row.Email,
+                    subject: document.getElementById('emailSubject').value.replaceAll('{Course}', row.Course),
+                    message: document.getElementById('emailTemplate').value.replaceAll('{Name}', row.Name).replaceAll('{Course}', row.Course),
+                    content_attachment: `data:application/pdf;base64,${base64Pdf}`
+                });
+                console.log('Sent to ' + row.Email);
+            }
+            alert("Done!");
+        }
     </script>
 </body>
 </html>
