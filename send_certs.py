@@ -1,80 +1,127 @@
-import email.utils
+import io
+import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import pandas as pd
+import streamlit as st
 
-# --- CONFIGURATION SETTINGS ---
-SMTP_SERVER = "://gmail.com"  # e.g., ://gmail.com for Gmail
-SMTP_PORT = 587  # Standard TLS port
-SENDER_EMAIL = "your.email@gmail.com"
-SENDER_PASSWORD = "your_app_password"  # Use an App Password, NOT your regular password
+# --- Page Layout Configuration ---
+st.set_page_config(page_title="Certificate Automation", layout="centered")
+st.title("🎓 Automated Certificate Emailer")
+st.write("Upload your formatted Excel file below to dispatch certificates.")
 
+# --- Email Credentials (Loaded Securely from Hugging Face Settings) ---
+SMTP_SERVER = "://gmail.com"
+SMTP_PORT = 587
+SENDER_EMAIL = os.environ.get("SENDER_EMAIL")
+SENDER_PASSWORD = os.environ.get("SENDER_PASSWORD")
 
-def send_certificates(excel_file_path):
+# --- UI Warning if secrets are missing ---
+if not SENDER_EMAIL or not SENDER_PASSWORD:
+    st.error(
+        "⚠️ Configuration Missing! Please set SENDER_EMAIL and SENDER_PASSWORD secrets in Space settings."
+    )
+
+# --- 1. File Upload UI ---
+uploaded_file = st.file_uploader(
+    "Drag and drop your students Excel file here", type=["xlsx", "xls"]
+)
+
+if uploaded_file is not None:
     try:
-        # 1. Load the Excel data
-        df = pd.read_excel(excel_file_path)
+        # Read the file directly out of Hugging Face's container memory
+        df = pd.read_excel(io.BytesIO(uploaded_file.read()))
 
-        # 2. Filter: Keep only students who passed and have a valid email/certificate
-        # This handles cases where 'Passed' is a string ("True") or boolean (True)
-        passed_students = df[
-            (df["Passed"].astype(str).str.strip().str.lower() == "true")
-            & (df["Email"].notna())
-            & (df["Certificate_URL"].notna())
+        # Check for mandatory data headers
+        required_columns = [
+            "First_Name",
+            "Last_Name",
+            "Email",
+            "Course",
+            "Passed",
+            "Certificate_URL",
         ]
+        missing_cols = [col for col in required_columns if col not in df.columns]
 
-        print(f"Found {len(passed_students)} passing students to email.\n")
-
-        # 3. Connect to the secure email server
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()  # Upgrade the connection to secure encryption
-        server.login(SENDER_EMAIL, SENDER_PASSWORD)
-
-        # 4. Loop through each student and send the email
-        for index, row in passed_students.iterrows():
-            first_name = row["First_Name"]
-            last_name = row["Last_Name"]
-            recipient_email = row["Email"]
-            course_name = row["Course"]
-            cert_url = row["Certificate_URL"]
-
-            # Create email structure
-            msg = MIMEMultipart()
-            msg["From"] = email.utils.formataddr(
-                ("Course Administration", SENDER_EMAIL)
+        if missing_cols:
+            st.error(
+                f"❌ Invalid format layout. Missing expected columns: {missing_cols}"
             )
-            msg["To"] = email.utils.formataddr(
-                (f"{first_name} {last_name}", recipient_email)
+        else:
+            # Preview loaded entries
+            st.success("✅ Excel File Layout Verified!")
+            st.write("### Data Preview (Showing top 5 rows)")
+            st.dataframe(df.head(5))
+
+            # Filter for rows where passed is explicitly True
+            passed_df = df[
+                (df["Passed"].astype(str).str.strip().str.lower() == "true")
+                & (df["Email"].notna())
+                & (df["Certificate_URL"].notna())
+            ]
+
+            st.metric(
+                label="Total Passing Students Found", value=len(passed_df)
             )
-            msg["Subject"] = f"Congratulations! Your Certificate for {course_name}"
 
-            # Email Body text (HTML supported)
-            body = f"""
-            <html>
-                <body>
-                    <p>Dear {first_name},</p>
-                    <p>Congratulations on passing the course <strong>{course_name}</strong>!</p>
-                    <p>Your hard work has paid off. You can access and download your official digital certificate using the link below:</p>
-                    <p><a href="{cert_url}" style="padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">View My Certificate</a></p>
-                    <br>
-                    <p>Best regards,<br>Your Learning Team</p>
-                </body>
-            </html>
-            """
-            msg.attach(MIMEText(body, "html"))
+            # --- 2. Dispatch Button Action ---
+            if st.button("🚀 Begin Email Dispatch", type="primary"):
+                if not SENDER_EMAIL or not SENDER_PASSWORD:
+                    st.error("Cannot proceed without environment secrets.")
+                else:
+                    progress_text = st.empty()
+                    progress_bar = st.progress(0)
 
-            # Send the email
-            server.sendmail(SENDER_EMAIL, recipient_email, msg.as_string())
-            print(f"Successfully sent certificate email to: {recipient_email}")
+                    try:
+                        # Establish a single pipeline session to prevent server spam
+                        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+                        server.starttls()
+                        server.login(SENDER_EMAIL, SENDER_PASSWORD)
 
-        # Clean up connection
-        server.quit()
-        print("\nAll emails processed completely.")
+                        total = len(passed_df)
+                        for idx, (index, row) in enumerate(
+                            passed_df.iterrows()
+                        ):
+                            # Craft email message payload
+                            msg = MIMEMultipart()
+                            msg["From"] = SENDER_EMAIL
+                            msg["To"] = row["Email"]
+                            msg["Subject"] = (
+                                f"Congratulations! Your Certificate for {row['Course']}"
+                            )
+
+                            body = f"""
+                            <html>
+                                <body>
+                                    <p>Dear {row['First_Name']},</p>
+                                    <p>Congratulations on passing the course <strong>{row['Course']}</strong>!</p>
+                                    <p>Access your official digital certificate here:</p>
+                                    <p><a href="{row['Certificate_URL']}" style="padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">View My Certificate</a></p>
+                                    <br>
+                                    <p>Best regards,<br>Learning Administration</p>
+                                </body>
+                            </html>
+                            """
+                            msg.attach(MIMEText(body, "html"))
+
+                            # Execute send action
+                            server.sendmail(
+                                SENDER_EMAIL, row["Email"], msg.as_string()
+                            )
+
+                            # Update Streamlit visual feedback indicators
+                            progress_text.text(
+                                f"Sending to {row['Email']} ({idx+1}/{total})..."
+                            )
+                            progress_bar.progress((idx + 1) / total)
+
+                        server.quit()
+                        st.balloons()
+                        st.success("🎉 All certificate emails sent successfully!")
+
+                    except Exception as email_err:
+                        st.error(f"Mail system error occurred: {email_err}")
 
     except Exception as e:
-        print(f"An error occurred during execution: {e}")
-
-
-# Run the script with your saved Excel file
-# send_certificates("students.xlsx")
+        st.error(f"Error handling file execution: {e}")
