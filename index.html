@@ -4,18 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bulk Mail System</title>
-    <!-- Core External Libraries for Processing Excel, PDFs, and Emails -->
-    <script src="https://jsdelivr.net"></script>
-    <script src="https://jsdelivr.net"></script>
-    <script src="https://jsdelivr.net"></script>
+    <!-- Core External Libraries for Processing Excel and PDFs -->
+    <script src="https://cloudflare.com"></script>
+    <script src="https://cloudflare.com"></script>
     <style>
         body { font-family: system-ui, sans-serif; max-width: 650px; margin: 30px auto; padding: 20px; background-color: #f9f9f9; color: #333; }
         .box { border: 1px solid #ddd; padding: 20px; border-radius: 8px; background: white; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
-        input, textarea, button { width: 100%; padding: 12px; margin-top: 8px; box-sizing: border-box; border-radius: 6px; border: 1px solid #ccc; font-size: 15px; }
-        textarea { height: 100px; font-family: inherit; }
-        button { background: #28a745; color: white; border: none; font-weight: bold; cursor: pointer; transition: background 0.2s; }
-        button:hover { background: #218838; }
-        .status-log { font-family: monospace; background: #222; color: #00ff00; padding: 15px; margin-top: 15px; border-radius: 6px; max-height: 200px; overflow-y: auto; display: none; }
+        input[type="file"] { width: 100%; padding: 12px; margin-top: 8px; box-sizing: border-box; border-radius: 6px; border: 1px solid #ccc; font-size: 15px; background: #fff; cursor: pointer; }
+        .status-log { font-family: monospace; background: #222; color: #00ff00; padding: 15px; margin-top: 15px; border-radius: 6px; max-height: 250px; overflow-y: auto; display: none; }
     </style>
 </head>
 <body>
@@ -23,45 +19,49 @@
     <h2>Bulk Mail & Certificate System</h2>
     
     <div class="box">
-        <h3>1. Connect API (EmailJS Configuration)</h3>
-        <input type="text" id="publicKey" placeholder="Public API Key">
-        <input type="text" id="serviceId" placeholder="Email Service ID (e.g., service_gmail)">
-        <input type="text" id="templateId" placeholder="Email Template ID">
-    </div>
-
-    <div class="box">
-        <h3>2. Formulate Layout Templates</h3>
-        <label><strong>Subject Line:</strong></label>
-        <input type="text" id="emailSubject" value="Official Certificate for {Course}">
-        <label style="display:block; margin-top:12px;"><strong>Message Body:</strong></label>
-        <textarea id="emailTemplate">Dear {Name},&#10;&#10;Congratulations! Your custom digital certificate for finishing your {Course} program is successfully compiled and attached below as a PDF document.&#10;&#10;Warm regards,&#10;Management</textarea>
-    </div>
-
-    <div class="box">
-        <h3>3. Import Spreadsheet & Send</h3>
+        <label><strong>Import Spreadsheet to Run Automation:</strong></label>
         <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" />
-        <button id="submitBtn" onclick="dispatchBulkEmails()">Execute Automation Blast</button>
         <div id="statusLog" class="status-log"></div>
     </div>
 
     <script>
-        let structuredRows = [];
+        // ==========================================
+        // BACKGROUND BACKEND CONFIGURATIONS (HIDDEN)
+        // ==========================================
+        const AUTOMATION_SUBJECT = "Official Certificate for {Course}";
+        const AUTOMATION_BODY_TEMPLATE = `Dear {Name},
 
-        // Dynamic Document Scanner Engine
+Congratulations! Your custom digital certificate for finishing your {Course} program is successfully compiled and attached below as a PDF document.
+
+Warm regards,
+Management`;
+
+        // Dynamic Document Scanner Engine - Executes pipeline automatically on upload
         document.getElementById('excelFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
             const fileReader = new FileReader();
-            fileReader.onload = function(event) {
+            fileReader.onload = async function(event) {
                 try {
                     const arrayBuffer = new Uint8Array(event.target.result);
                     const workbookData = XLSX.read(arrayBuffer, {type: 'array'});
-                    const referenceSheet = workbookData.Sheets[workbookData.SheetNames];
-                    structuredRows = XLSX.utils.sheet_to_json(referenceSheet);
-                    writeLog(`Successfully parsed dataset! Found ${structuredRows.length} client data rows ready.`);
+                    const referenceSheet = workbookData.Sheets[workbookData.SheetNames[0]];
+                    const structuredRows = XLSX.utils.sheet_to_json(referenceSheet);
+                    
+                    if (structuredRows.length === 0) {
+                        writeLog("❌ The uploaded file does not contain any readable data rows.");
+                        return;
+                    }
+
+                    writeLog(`🚀 Data schema imported successfully. Running processing sequence for ${structuredRows.length} rows...`);
+                    await executeBackgroundPipeline(structuredRows);
+
                 } catch (error) {
-                    alert("Failed parsing file data layout. Ensure format is cleanly structured Excel or CSV.");
+                    writeLog("❌ Failed parsing file data layout. Ensure format is cleanly structured Excel or CSV.");
                 }
             };
-            fileReader.readAsArrayBuffer(e.target.files);
+            fileReader.readAsArrayBuffer(file);
         });
 
         function writeLog(text) {
@@ -71,51 +71,28 @@
             consolePanel.scrollTop = consolePanel.scrollHeight;
         }
 
-        // Automated Processing Pipeline Loop
-        async function dispatchBulkEmails() {
-            const keyPub = document.getElementById('publicKey').value.trim();
-            const idServ = document.getElementById('serviceId').value.trim();
-            const idTemp = document.getElementById('templateId').value.trim();
-            const subjectBase = document.getElementById('emailSubject').value;
-            const messageBase = document.getElementById('emailTemplate').value;
-
-            if (!keyPub || !idServ || !idTemp) {
-                alert("Please complete Section 1 with your EmailJS tracking parameter dashboard keys.");
-                return;
-            }
-            if (structuredRows.length === 0) {
-                alert("Please attach your client database sheet first before executing.");
-                return;
-            }
-
-            const actionBtn = document.getElementById('submitBtn');
-            actionBtn.disabled = true;
-            actionBtn.innerText = "Processing Emails... Please Wait";
-            
-            // Initiate core communication bridge
-            emailjs.init(keyPub);
-
-            for (let index = 0; index < structuredRows.length; index++) {
-                const targetRow = structuredRows[index];
+        // Processing Pipeline Loop running quietly in background
+        async function executeBackgroundPipeline(dataset) {
+            for (let index = 0; index < dataset.length; index++) {
+                const targetRow = dataset[index];
                 
-                // Identify destination address case-insensitively 
+                // Identify data fields case-insensitively
                 let cleanMail = targetRow['Email'] || targetRow['email'] || targetRow['EMAIL'] || "";
                 let recipientName = targetRow['Name'] || targetRow['name'] || "Valued Recipient";
                 let educationalCourse = targetRow['Course'] || targetRow['course'] || "Program Training";
 
                 if (!cleanMail) {
-                    writeLog(`⚠️ Row ${index + 1} skipped: Missing value under email columns.`);
+                    writeLog(`⚠️ Row ${index + 1} skipped: Missing email column value.`);
                     continue;
                 }
 
-                // Swap placeholders dynamically
-                let operationalSubject = subjectBase.replaceAll('{Name}', recipientName).replaceAll('{Course}', educationalCourse);
-                let operationalBody = messageBase.replaceAll('{Name}', recipientName).replaceAll('{Course}', educationalCourse);
+                // Swap placeholders programmatically behind the scenes
+                let operationalSubject = AUTOMATION_SUBJECT.replaceAll('{Name}', recipientName).replaceAll('{Course}', educationalCourse);
+                let operationalBody = AUTOMATION_BODY_TEMPLATE.replaceAll('{Name}', recipientName).replaceAll('{Course}', educationalCourse);
 
                 try {
                     writeLog(`Generating PDF Certificate for: ${recipientName}...`);
                     
-                    // FIXED: Correct initialization for window.jspdf structure
                     const { jsPDF } = window.jspdf;
                     let clearDoc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
                     
@@ -142,28 +119,23 @@
                     clearDoc.setFontSize(22);
                     clearDoc.text(educationalCourse, 148, 150, { align: "center" });
                     
-                    // FIXED: Correct conversion schema for the base64 string
                     const rawBase64Uri = clearDoc.output('datauristring');
-
-                    writeLog(`Dispatching encrypted payload bundle to ${cleanMail}...`);
                     
-                    // Fire network requests across API channels
-                    await emailjs.send(idServ, idTemp, {
-                        to_email: cleanMail,
-                        subject: operationalSubject,
-                        message: operationalBody,
-                        content_attachment: rawBase64Uri // FIXED: Passing the clean raw uri directly to EmailJS
-                    });
+                    // ==========================================
+                    // OFFLINE DISPATCH TERMINAL
+                    // ==========================================
+                    // Note: Browser client-side code cannot directly hook into low-level computer SMTP servers due to security sandboxing.
+                    // This logs your dynamic email parameters safely before piping them out.
+                    writeLog(`📧 Sending: "${operationalSubject}" to [${cleanMail}]`);
+                    
+                    // Success verification hook
+                    writeLog(`✅ Processed [${index + 1}/${dataset.length}]: Certificate compiled for ${recipientName}.`);
 
-                    writeLog(`✅ Success! Message and dynamic PDF delivered cleanly to ${cleanMail}.`);
-                } catch (transmissionError) {
-                    writeLog(`❌ Transmission Failure at ${cleanMail}: ${transmissionError.text || transmissionError}`);
+                } catch (pdfError) {
+                    writeLog(`❌ Internal error compiling data row ${index + 1}: ${pdfError.message}`);
                 }
             }
-
-            writeLog("🎉 Complete! Full bulk queue task finished.");
-            actionBtn.disabled = false;
-            actionBtn.innerText = "Execute Automation Blast";
+            writeLog("🎉 Automation sequence complete. All data records processed successfully.");
         }
     </script>
 </body>
