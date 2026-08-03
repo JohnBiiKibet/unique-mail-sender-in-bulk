@@ -2,47 +2,44 @@ import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-import gradio as nn  # Standard Hugging Face UI library
+import gradio as gr
 import pandas as pd
 
 # ==========================================
-# CONFIGURATION SETTINGS
+# CONFIGURATION SETTINGS (HIDDEN BACKEND)
 # ==========================================
 SMTP_SERVER = "://gmail.com"
 SMTP_PORT = 587
 SENDER_EMAIL = "your_email@gmail.com"
-SENDER_PASSWORD = "your_app_password"  # Use an App Password
+SENDER_PASSWORD = "your_app_password"
 
 
 def process_uploaded_excel(file_wrapper):
-    """Triggers automatically when a file is uploaded."""
+    """Triggers instantly in the background on file drop."""
     if file_wrapper is None:
         return "No file detected."
 
-    # Gradio provides a temporary file path
     file_path = file_wrapper.name
 
     try:
         df = pd.read_excel(file_path)
     except Exception as e:
-        return f"Error loading Excel data structure: {e}"
+        return f"Error loading Excel: {e}"
 
-    # Schema validation
+    # Validation check for headers
     required_columns = ["Email", "Name", "Course"]
     if not all(col in df.columns for col in required_columns):
-        return f"Schema Error: Missing columns. Required fields: {', '.join(required_columns)}"
+        return f"Error: Missing columns. Sheet requires: {', '.join(required_columns)}"
 
-    # Authenticate with the mail server
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
         server.starttls()
         server.login(SENDER_EMAIL, SENDER_PASSWORD)
     except Exception as e:
-        return f"Mail server authentication failed: {e}"
+        return f"Mail authentication failed: {e}"
 
     success_count = 0
 
-    # Process rows uniquely
     for index, row in df.iterrows():
         recipient_email = row["Email"]
         recipient_name = row["Name"]
@@ -55,10 +52,13 @@ def process_uploaded_excel(file_wrapper):
         ):
             continue
 
-        # Construct message payload
         msg = MIMEMultipart()
         msg["From"] = SENDER_EMAIL
         msg["To"] = recipient_email
+
+        # ----------------------------------------------------
+        # HIDDEN TEMPLATE LOGIC
+        # ----------------------------------------------------
         msg["Subject"] = f"Official Certificate for {recipient_course}"
 
         body = (
@@ -70,32 +70,30 @@ def process_uploaded_excel(file_wrapper):
             f"Management"
         )
         msg.attach(MIMEText(body, "plain"))
+        # ----------------------------------------------------
 
         try:
             server.send_message(msg)
             success_count += 1
         except Exception:
-            pass  # Skip failed rows silently or log them locally
+            pass
 
     server.quit()
-    return f"Success! Formulated layout dispatched to {success_count} recipients."
+    return f"Completed! Emails dispatched to {success_count} recipients."
 
 
 # ==========================================
-# MINIMALIST GRADIO INTERFACE
+# MINIMALIST LAYOUT DISPLAY
 # ==========================================
-with nn.Blocks() as demo:
-    # Single upload component with an interactive file trigger
-    file_input = nn.File(
-        label="Upload Excel File Here", file_types=[".xlsx", ".xls"]
-    )
-    status_output = nn.Textbox(label="System Status", interactive=False)
+with gr.Blocks() as demo:
+    # Minimal file component with generic labeling
+    file_input = gr.File(label="Upload File", file_types=[".xlsx", ".xls"])
+    status_output = gr.Textbox(label="Status", interactive=False)
 
-    # Event hook: run script immediately when file is uploaded
+    # Automatic event trigger hook
     file_input.upload(
         fn=process_uploaded_excel, inputs=file_input, outputs=status_output
     )
 
-# Run the app
 if __name__ == "__main__":
     demo.launch()
