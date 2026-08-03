@@ -2,52 +2,45 @@ import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+import gradio as nn  # Standard Hugging Face UI library
 import pandas as pd
 
 # ==========================================
 # CONFIGURATION SETTINGS
 # ==========================================
-# Email Server Authentication (Direct SMTP)
 SMTP_SERVER = "://gmail.com"
 SMTP_PORT = 587
 SENDER_EMAIL = "your_email@gmail.com"
-SENDER_PASSWORD = "your_app_password"  # Use your specific App Password
-
-# Excel Settings
-EXCEL_FILE = "recipients.xlsx"
+SENDER_PASSWORD = "your_app_password"  # Use an App Password
 
 
-def process_and_send_emails():
-    """Reads the Excel file and dispatches hardcoded template emails."""
-    print("Initializing offline email dispatch sequence...")
+def process_uploaded_excel(file_wrapper):
+    """Triggers automatically when a file is uploaded."""
+    if file_wrapper is None:
+        return "No file detected."
 
-    # Validate Excel source
-    if not os.path.exists(EXCEL_FILE):
-        print(f"Critical Error: Source file '{EXCEL_FILE}' not found.")
-        return
+    # Gradio provides a temporary file path
+    file_path = file_wrapper.name
 
     try:
-        df = pd.read_excel(EXCEL_FILE)
+        df = pd.read_excel(file_path)
     except Exception as e:
-        print(f"Error loading Excel data structure: {e}")
-        return
+        return f"Error loading Excel data structure: {e}"
 
-    # Enforce schema validation
+    # Schema validation
     required_columns = ["Email", "Name", "Course"]
     if not all(col in df.columns for col in required_columns):
-        print(
-            f"Schema Error: Missing columns. Required fields: {', '.join(required_columns)}"
-        )
-        return
+        return f"Schema Error: Missing columns. Required fields: {', '.join(required_columns)}"
 
-    # Authenticate with the direct mail server
+    # Authenticate with the mail server
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
         server.starttls()
         server.login(SENDER_EMAIL, SENDER_PASSWORD)
     except Exception as e:
-        print(f"Mail server authentication failed: {e}")
-        return
+        return f"Mail server authentication failed: {e}"
+
+    success_count = 0
 
     # Process rows uniquely
     for index, row in df.iterrows():
@@ -55,23 +48,17 @@ def process_and_send_emails():
         recipient_name = row["Name"]
         recipient_course = row["Course"]
 
-        # Handle null anomalies safely
         if (
             pd.isna(recipient_email)
             or pd.isna(recipient_name)
             or pd.isna(recipient_course)
         ):
-            print(f"Skipping index line {index + 1}: Contains empty values.")
             continue
 
         # Construct message payload
         msg = MIMEMultipart()
         msg["From"] = SENDER_EMAIL
         msg["To"] = recipient_email
-
-        # ----------------------------------------------------
-        # HARDCODED TEMPLATE LAYOUT
-        # ----------------------------------------------------
         msg["Subject"] = f"Official Certificate for {recipient_course}"
 
         body = (
@@ -83,21 +70,32 @@ def process_and_send_emails():
             f"Management"
         )
         msg.attach(MIMEText(body, "plain"))
-        # ----------------------------------------------------
 
-        # Dispatch
         try:
             server.send_message(msg)
-            print(
-                f"[{index + 1}] Successfully sent to: {recipient_email} ({recipient_course})"
-            )
-        except Exception as e:
-            print(f"Failed transmission to {recipient_email}: {e}")
+            success_count += 1
+        except Exception:
+            pass  # Skip failed rows silently or log them locally
 
     server.quit()
-    print("Process complete. All unique rows parsed.")
+    return f"Success! Formulated layout dispatched to {success_count} recipients."
 
 
+# ==========================================
+# MINIMALIST GRADIO INTERFACE
+# ==========================================
+with nn.Blocks() as demo:
+    # Single upload component with an interactive file trigger
+    file_input = nn.File(
+        label="Upload Excel File Here", file_types=[".xlsx", ".xls"]
+    )
+    status_output = nn.Textbox(label="System Status", interactive=False)
+
+    # Event hook: run script immediately when file is uploaded
+    file_input.upload(
+        fn=process_uploaded_excel, inputs=file_input, outputs=status_output
+    )
+
+# Run the app
 if __name__ == "__main__":
-    # Runs automatically when executing the main file locally
-    process_and_send_emails()
+    demo.launch()
