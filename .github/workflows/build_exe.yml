@@ -50,8 +50,6 @@ jobs:
     # ==========================================
     - name: Build Standalone Application via PyInstaller
       run: |
-        # Removed '--windowed' to bypass false antivirus blocks
-        # Included '--collect-all' to bundle interface assets inside the app
         pyinstaller --onefile --collect-all gradio send_certs.py
 
     # ==========================================
