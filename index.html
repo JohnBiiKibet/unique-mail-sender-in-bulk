@@ -87,33 +87,33 @@ Congratulations! Your custom digital certificate for finishing your {Course} pro
 Warm regards,
 Management`;
 
-        // FIXED: Modern Async Event Listener for processing Excel correctly
+        // FIXED: Correctly tracking files and reading ArrayBuffer dynamically
         document.getElementById('excelFile').addEventListener('change', async function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
+            const files = e.target.files;
+            if (!files || files.length === 0) return;
             
             try {
-                // Read file directly into an ArrayBuffer
-                const arrayBuffer = await file.arrayBuffer();
+                const uploadedFile = files[0];
+                const arrayBuffer = await uploadedFile.arrayBuffer();
                 const workbookData = XLSX.read(arrayBuffer, { type: 'array' });
                 
-                // FIXED: Explicitly grab the first spreadsheet tab [0]
-                const firstSheetName = workbookData.SheetNames[0];
+                // FIXED: Targets the literal text name of the FIRST sheet tab
+                const firstSheetName = workbookData.SheetNames[0]; 
                 const referenceSheet = workbookData.Sheets[firstSheetName];
                 
-                // Parse rows cleanly to arrays
+                // Parse rows into JSON structures
                 structuredRows = XLSX.utils.sheet_to_json(referenceSheet);
                 
                 if (structuredRows.length > 0) {
                     document.getElementById('cancelBtn').style.display = "block";
-                    console.log(`Parsed ${structuredRows.length} rows successfully.`);
+                    console.log(`Successfully parsed ${structuredRows.length} rows.`);
                 } else {
-                    alert("The uploaded Excel file appears to be completely empty.");
+                    alert("The uploaded Excel file appears to be empty.");
                     cancelUploadedFile();
                 }
             } catch (error) {
                 alert("Failed parsing file. Ensure format is cleanly structured Excel or CSV.");
-                console.error(error);
+                console.error("Parsing context dump:", error);
                 cancelUploadedFile();
             }
         });
