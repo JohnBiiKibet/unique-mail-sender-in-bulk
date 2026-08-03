@@ -1,127 +1,103 @@
-import io
 import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import pandas as pd
-import streamlit as st
 
-# --- Page Layout Configuration ---
-st.set_page_config(page_title="Certificate Automation", layout="centered")
-st.title("🎓 Automated Certificate Emailer")
-st.write("Upload your formatted Excel file below to dispatch certificates.")
-
-# --- Email Credentials (Loaded Securely from Hugging Face Settings) ---
+# ==========================================
+# CONFIGURATION SETTINGS
+# ==========================================
+# Email Server Authentication (Direct SMTP)
 SMTP_SERVER = "://gmail.com"
 SMTP_PORT = 587
-SENDER_EMAIL = os.environ.get("SENDER_EMAIL")
-SENDER_PASSWORD = os.environ.get("SENDER_PASSWORD")
+SENDER_EMAIL = "your_email@gmail.com"
+SENDER_PASSWORD = "your_app_password"  # Use your specific App Password
 
-# --- UI Warning if secrets are missing ---
-if not SENDER_EMAIL or not SENDER_PASSWORD:
-    st.error(
-        "⚠️ Configuration Missing! Please set SENDER_EMAIL and SENDER_PASSWORD secrets in Space settings."
-    )
+# Excel Settings
+EXCEL_FILE = "recipients.xlsx"
 
-# --- 1. File Upload UI ---
-uploaded_file = st.file_uploader(
-    "Drag and drop your students Excel file here", type=["xlsx", "xls"]
-)
 
-if uploaded_file is not None:
+def process_and_send_emails():
+    """Reads the Excel file and dispatches hardcoded template emails."""
+    print("Initializing offline email dispatch sequence...")
+
+    # Validate Excel source
+    if not os.path.exists(EXCEL_FILE):
+        print(f"Critical Error: Source file '{EXCEL_FILE}' not found.")
+        return
+
     try:
-        # Read the file directly out of Hugging Face's container memory
-        df = pd.read_excel(io.BytesIO(uploaded_file.read()))
-
-        # Check for mandatory data headers
-        required_columns = [
-            "First_Name",
-            "Last_Name",
-            "Email",
-            "Course",
-            "Passed",
-            "Certificate_URL",
-        ]
-        missing_cols = [col for col in required_columns if col not in df.columns]
-
-        if missing_cols:
-            st.error(
-                f"❌ Invalid format layout. Missing expected columns: {missing_cols}"
-            )
-        else:
-            # Preview loaded entries
-            st.success("✅ Excel File Layout Verified!")
-            st.write("### Data Preview (Showing top 5 rows)")
-            st.dataframe(df.head(5))
-
-            # Filter for rows where passed is explicitly True
-            passed_df = df[
-                (df["Passed"].astype(str).str.strip().str.lower() == "true")
-                & (df["Email"].notna())
-                & (df["Certificate_URL"].notna())
-            ]
-
-            st.metric(
-                label="Total Passing Students Found", value=len(passed_df)
-            )
-
-            # --- 2. Dispatch Button Action ---
-            if st.button("🚀 Begin Email Dispatch", type="primary"):
-                if not SENDER_EMAIL or not SENDER_PASSWORD:
-                    st.error("Cannot proceed without environment secrets.")
-                else:
-                    progress_text = st.empty()
-                    progress_bar = st.progress(0)
-
-                    try:
-                        # Establish a single pipeline session to prevent server spam
-                        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-                        server.starttls()
-                        server.login(SENDER_EMAIL, SENDER_PASSWORD)
-
-                        total = len(passed_df)
-                        for idx, (index, row) in enumerate(
-                            passed_df.iterrows()
-                        ):
-                            # Craft email message payload
-                            msg = MIMEMultipart()
-                            msg["From"] = SENDER_EMAIL
-                            msg["To"] = row["Email"]
-                            msg["Subject"] = (
-                                f"Congratulations! Your Certificate for {row['Course']}"
-                            )
-
-                            body = f"""
-                            <html>
-                                <body>
-                                    <p>Dear {row['First_Name']},</p>
-                                    <p>Congratulations on passing the course <strong>{row['Course']}</strong>!</p>
-                                    <p>Access your official digital certificate here:</p>
-                                    <p><a href="{row['Certificate_URL']}" style="padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px;">View My Certificate</a></p>
-                                    <br>
-                                    <p>Best regards,<br>Learning Administration</p>
-                                </body>
-                            </html>
-                            """
-                            msg.attach(MIMEText(body, "html"))
-
-                            # Execute send action
-                            server.sendmail(
-                                SENDER_EMAIL, row["Email"], msg.as_string()
-                            )
-
-                            # Update Streamlit visual feedback indicators
-                            progress_text.text(
-                                f"Sending to {row['Email']} ({idx+1}/{total})..."
-                            )
-                            progress_bar.progress((idx + 1) / total)
-
-                        server.quit()
-                        st.balloons()
-                        st.success("🎉 All certificate emails sent successfully!")
-
-                    except Exception as email_err:
-                        st.error(f"Mail system error occurred: {email_err}")
-
+        df = pd.read_excel(EXCEL_FILE)
     except Exception as e:
-        st.error(f"Error handling file execution: {e}")
+        print(f"Error loading Excel data structure: {e}")
+        return
+
+    # Enforce schema validation
+    required_columns = ["Email", "Name", "Course"]
+    if not all(col in df.columns for col in required_columns):
+        print(
+            f"Schema Error: Missing columns. Required fields: {', '.join(required_columns)}"
+        )
+        return
+
+    # Authenticate with the direct mail server
+    try:
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server.starttls()
+        server.login(SENDER_EMAIL, SENDER_PASSWORD)
+    except Exception as e:
+        print(f"Mail server authentication failed: {e}")
+        return
+
+    # Process rows uniquely
+    for index, row in df.iterrows():
+        recipient_email = row["Email"]
+        recipient_name = row["Name"]
+        recipient_course = row["Course"]
+
+        # Handle null anomalies safely
+        if (
+            pd.isna(recipient_email)
+            or pd.isna(recipient_name)
+            or pd.isna(recipient_course)
+        ):
+            print(f"Skipping index line {index + 1}: Contains empty values.")
+            continue
+
+        # Construct message payload
+        msg = MIMEMultipart()
+        msg["From"] = SENDER_EMAIL
+        msg["To"] = recipient_email
+
+        # ----------------------------------------------------
+        # HARDCODED TEMPLATE LAYOUT
+        # ----------------------------------------------------
+        msg["Subject"] = f"Official Certificate for {recipient_course}"
+
+        body = (
+            f"Dear {recipient_name},\n\n"
+            f"Congratulations! Your custom digital certificate for finishing your "
+            f"{recipient_course} program is successfully compiled and attached below "
+            f"as a PDF document.\n\n"
+            f"Warm regards,\n"
+            f"Management"
+        )
+        msg.attach(MIMEText(body, "plain"))
+        # ----------------------------------------------------
+
+        # Dispatch
+        try:
+            server.send_message(msg)
+            print(
+                f"[{index + 1}] Successfully sent to: {recipient_email} ({recipient_course})"
+            )
+        except Exception as e:
+            print(f"Failed transmission to {recipient_email}: {e}")
+
+    server.quit()
+    print("Process complete. All unique rows parsed.")
+
+
+if __name__ == "__main__":
+    # Runs automatically when executing the main file locally
+    process_and_send_emails()
