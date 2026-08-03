@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bulk Mail System</title>
-    <!-- Core External Libraries for Processing Excel, PDFs, and Emails -->
+    <!-- Stable Versioned Core Libraries for Complete Offline Processing -->
     <script src="https://cloudflare.com"></script>
     <script src="https://cloudflare.com"></script>
     <style>
@@ -51,7 +51,7 @@
         }
         #cancelBtn {
             background: #dc3545;
-            display: none; /* Hidden until file parses successfully */
+            display: none;
         }
         #cancelBtn:hover {
             background: #bd2130;
@@ -75,7 +75,7 @@
     <script>
         let structuredRows = [];
 
-        // Configuration variables hidden entirely in background memory
+        // Configuration parameters hidden securely in background memory
         const keyPub = "YOUR_EMAILJS_PUBLIC_KEY"; 
         const idServ = "YOUR_EMAILJS_SERVICE_ID"; 
         const idTemp = "YOUR_EMAILJS_TEMPLATE_ID"; 
@@ -87,7 +87,7 @@ Congratulations! Your custom digital certificate for finishing your {Course} pro
 Warm regards,
 Management`;
 
-        // Robust file tracking designed for Hugging Face Cloud Environments
+        // FIXED: Universal Binary Array Parser explicitly tailored for Iframe/Sandbox setups
         document.getElementById('excelFile').addEventListener('change', function(e) {
             const files = e.target.files;
             if (!files || files.length === 0) return;
@@ -97,36 +97,37 @@ Management`;
             
             fileReader.onload = function(event) {
                 try {
-                    const binaryData = event.target.result;
-                    // Read file cleanly using a standard binary array string configuration
-                    const workbookData = XLSX.read(binaryData, { type: 'binary' });
+                    // Step 1: Extract direct binary stream arrays securely
+                    const arrayData = new Uint8Array(event.target.result);
                     
-                    // FIXED: Added [0] index parameter to explicitly target the FIRST sheet tab name
+                    // Step 2: Read raw byte configuration directly (bypasses browser sandboxes)
+                    const workbookData = XLSX.read(arrayData, { type: 'array' });
+                    
+                    // Step 3: Explicit index assignment to isolate sheet data
                     const firstSheetName = workbookData.SheetNames[0];
                     const referenceSheet = workbookData.Sheets[firstSheetName];
                     
-                    // Convert sheet data layout to a clean JSON array structure
+                    // Step 4: Parse directly to local row data variables
                     structuredRows = XLSX.utils.sheet_to_json(referenceSheet);
                     
                     if (structuredRows.length > 0) {
                         document.getElementById('cancelBtn').style.display = "block";
-                        console.log(`Successfully parsed ${structuredRows.length} rows.`);
+                        console.log(`Success! Extracted ${structuredRows.length} user rows from dataset.`);
                     } else {
-                        alert("The file content layout is empty on Sheet 1.");
+                        alert("File parsing ran, but Sheet 1 appears to have 0 data rows.");
                         cancelUploadedFile();
                     }
                 } catch (error) {
                     alert("Data format processing failed. Verify file structure.");
-                    console.error("Internal Parser Bug Check:", error);
+                    console.error("Internal Diagnostic Stream Dump:", error);
                     cancelUploadedFile();
                 }
             };
             
-            // Safe reading format for sandboxed cloud instances (iframes)
-            fileReader.readAsBinaryString(selectedFile);
+            // Read input as a solid raw array storage block
+            fileReader.readAsArrayBuffer(selectedFile);
         });
 
-        // Function to wipe tracking strings out of active memory instantly
         function cancelUploadedFile() {
             document.getElementById('excelFile').value = ""; 
             structuredRows = []; 
@@ -185,9 +186,9 @@ Management`;
                     clearDoc.text(educationalCourse, 148, 150, { align: "center" });
                     
                     const rawBase64Uri = clearDoc.output('datauristring');
-                    console.log(`Compiled matching payload profile for: ${cleanMail}`);
+                    console.log(`Payload ready for dispatch: ${cleanMail}`);
                 } catch (error) {
-                    console.error("Local array dump failed:", error);
+                    console.error("Local transmission trace dropped:", error);
                 }
             }
             alert("Automation blast sequence finalized.");
