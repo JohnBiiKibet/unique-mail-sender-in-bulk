@@ -26,21 +26,39 @@
             cursor: pointer; 
             margin-bottom: 15px;
         }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
         button { 
-            width: 100%; 
+            flex: 1;
             padding: 15px; 
             box-sizing: border-box; 
             border-radius: 6px; 
-            background: #28a745; 
-            color: white; 
-            border: none; 
             font-weight: bold; 
             font-size: 16px; 
             cursor: pointer; 
-            transition: background 0.2s; 
+            transition: background 0.2s, opacity 0.2s; 
+            border: none;
+            color: white; 
         }
-        button:hover { 
+        #submitBtn { 
+            background: #28a745; 
+        }
+        #submitBtn:hover { 
             background: #218838; 
+        }
+        #cancelBtn {
+            background: #dc3545;
+            display: none; /* Hidden by default until a file is loaded */
+        }
+        #cancelBtn:hover {
+            background: #bd2130;
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
         }
     </style>
 </head>
@@ -48,7 +66,11 @@
 
     <!-- ONLY DISPLAYED ELEMENTS ON THE WEBSITE -->
     <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" />
-    <button id="submitBtn" onclick="dispatchBulkEmails()">Execute Automation Blast</button>
+    
+    <div class="btn-group">
+        <button id="cancelBtn" onclick="cancelUploadedFile()">Cancel File</button>
+        <button id="submitBtn" onclick="dispatchBulkEmails()">Execute Automation Blast</button>
+    </div>
 
     <script>
         let structuredRows = [];
@@ -67,6 +89,8 @@ Management`;
 
         // File reader remains active in the background
         document.getElementById('excelFile').addEventListener('change', function(e) {
+            if (e.target.files.length === 0) return;
+            
             const fileReader = new FileReader();
             fileReader.onload = function(event) {
                 try {
@@ -74,13 +98,25 @@ Management`;
                     const workbookData = XLSX.read(arrayBuffer, {type: 'array'});
                     const referenceSheet = workbookData.Sheets[workbookData.SheetNames];
                     structuredRows = XLSX.utils.sheet_to_json(referenceSheet);
+                    
+                    // Show the cancel button once a valid file is loaded
+                    document.getElementById('cancelBtn').style.display = "block";
                     console.log(`Parsed ${structuredRows.length} rows.`);
                 } catch (error) {
                     alert("Failed parsing file. Ensure format is cleanly structured Excel or CSV.");
+                    cancelUploadedFile();
                 }
             };
             fileReader.readAsArrayBuffer(e.target.files);
         });
+
+        // Function to reset selection and delete memory data
+        function cancelUploadedFile() {
+            document.getElementById('excelFile').value = ""; // Clear file layout
+            structuredRows = []; // Wipe arrays from hidden memory
+            document.getElementById('cancelBtn').style.display = "none"; // Hide button again
+            alert("File upload canceled and memory cleared.");
+        }
 
         async function dispatchBulkEmails() {
             if (structuredRows.length === 0) {
@@ -89,7 +125,10 @@ Management`;
             }
 
             const actionBtn = document.getElementById('submitBtn');
+            const cancelBtn = document.getElementById('cancelBtn');
+            
             actionBtn.disabled = true;
+            cancelBtn.disabled = true;
             actionBtn.innerText = "Processing...";
 
             for (let index = 0; index < structuredRows.length; index++) {
@@ -133,14 +172,15 @@ Management`;
                     const rawBase64Uri = clearDoc.output('datauristring');
                     
                     console.log(`Sending to ${cleanMail}...`);
-                    // This runs quietly in the background without showing on screen
                 } catch (error) {
                     console.error(error);
                 }
             }
             alert("Automation sequence complete.");
             actionBtn.disabled = false;
+            cancelBtn.disabled = false;
             actionBtn.innerText = "Execute Automation Blast";
+            cancelUploadedFile(); // Auto-clean after execution finishes
         }
     </script>
 </body>
