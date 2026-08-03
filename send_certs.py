@@ -1,19 +1,23 @@
 import os
 import smtplib
+import sys
+import tkinter as tk
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-import gradio as gr
+from tkinter import filedialog, messagebox
 import pandas as pd
+import requests
 
 # ==========================================
-# BACKEND SETTINGS (HIDDEN FROM DISPLAY)
+# SECURE CONFIGURATION VALUES
 # ==========================================
-# Input your direct SMTP email configuration details here
 SMTP_SERVER = "://gmail.com"
 SMTP_PORT = 587
-SENDER_EMAIL = "your_email@gmail.com"
-SENDER_PASSWORD = "your_app_password"  # Use a secure App Password, not a standard login pass
+SENDER_EMAIL = "your_email@gmail.com"  # Put your email address here
+SENDER_PASSWORD = (
+    "your_app_password"  # Put your secure 16-digit App Password here
+)
 
 AUTOMATION_SUBJECT = "Official Certificate for {Course}"
 AUTOMATION_BODY_TEMPLATE = """Dear {Name},
@@ -24,122 +28,153 @@ Warm regards,
 Management"""
 
 
-def run_bulk_pipeline(file_obj):
-    """Parses Excel dataset and directly fires emails via secure native SMTP channels."""
-    if file_obj is None:
-        return "Please upload an Excel workbook sheet before running execution."
+class BulkMailApp:
 
-    try:
-        # Load the uploaded file data stream directly
-        df = pd.read_excel(file_obj.name)
-    except Exception as e:
-        return f"File parser crash structural check: {str(e)}"
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Bulk Mail System")
+        self.root.geometry("400x250")
+        self.root.resizable(False, False)
 
-    # Enforce database schema parameters case-sensitively
-    required_columns = ["Email", "Name", "Course"]
-    if not all(col in df.columns for col in required_columns):
-        return f"Database Schema Mismatch! Missing fields. Ensure columns are explicitly labeled: {', '.join(required_columns)}"
+        self.file_path = ""
 
-    # Initialize connection tracking with direct mail network server
-    try:
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(SENDER_EMAIL, SENDER_PASSWORD)
-    except Exception as e:
-        return (
-            f"Direct network authentication failed. Verify SMTP keys: {str(e)}"
+        # Minimalist UI Elements
+        self.label = tk.Label(
+            root, text="Bulk Mail & Certificate System", font=("Arial", 14, "bold")
         )
+        self.label.pack(pady=20)
 
-    success_count = 0
+        self.upload_btn = tk.Button(
+            root,
+            text="📁 Upload Excel File",
+            command=self.select_file,
+            width=25,
+            bg="#f0f0f0",
+        )
+        self.upload_btn.pack(pady=10)
 
-    for index, row in df.iterrows():
-        recipient_email = str(row["Email"]).strip()
-        recipient_name = str(row["Name"]).strip()
-        recipient_course = str(row["Course"]).strip()
+        self.execute_btn = tk.Button(
+            root,
+            text="Execute Automation Blast",
+            command=self.process_emails,
+            width=25,
+            bg="#28a745",
+            fg="white",
+            state=tk.DISABLED,
+        )
+        self.execute_btn.pack(pady=10)
 
-        # Safely skip corrupted or empty row profiles
-        if (
-            pd.isna(row["Email"])
-            or pd.isna(row["Name"])
-            or pd.isna(row["Course"])
-        ):
-            continue
+        self.status_label = tk.Label(
+            root, text="Status: Waiting for file...", fg="#555"
+        )
+        self.status_label.pack(pady=10)
 
-        # Format layout templates dynamically
-        final_subject = AUTOMATION_SUBJECT.replace(
-            "{Course}", recipient_course
-        ).replace("{Name}", recipient_name)
-        final_body = AUTOMATION_BODY_TEMPLATE.replace(
-            "{Course}", recipient_course
-        ).replace("{Name}", recipient_name)
+    def select_file(self):
+        self.file_path = filedialog.askopenfilename(
+            filetypes=[("Excel Files", "*.xlsx *.xls"), ("CSV Files", "*.csv")]
+        )
+        if self.file_path:
+            filename = os.path.basename(self.file_path)
+            self.upload_btn.config(text=f"📄 {filename}")
+            self.execute_btn.config(state=tk.NORMAL)
+            self.status_label.config(text="Status: File loaded. Ready to send.")
 
-        # Build message container
-        msg = MIMEMultipart()
-        msg["From"] = SENDER_EMAIL
-        msg["To"] = recipient_email
-        msg["Subject"] = final_subject
-        msg.attach(MIMEText(final_body, "plain"))
+    def process_emails(self):
+        self.execute_btn.config(state=tk.DISABLED, text="Processing...")
+        self.root.update()
 
-        # ----------------------------------------------------------------
-        # SIMULATED PDF CERTIFICATE PIPELINE (OR ATTACH PRE-CREATED LOCAL FILES)
-        # ----------------------------------------------------------------
-        # If your local space container already stores files dynamically matching names:
-        pdf_path = f"certificates/{recipient_name}.pdf"
+        try:
+            if self.file_path.endswith((".xlsx", ".xls")):
+                df = pd.read_excel(self.file_path)
+            else:
+                df = pd.read_csv(self.file_path)
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not read spreadsheet: {e}")
+            self.reset_ui()
+            return
 
-        if os.path.exists(pdf_path):
+        required_columns = ["Email", "Name", "Course", "Certificate"]
+        if not all(col in df.columns for col in required_columns):
+            messagebox.showerror(
+                "Error",
+                f"Missing headers! Ensure sheet columns are exactly:\n{', '.join(required_columns)}",
+            )
+            self.reset_ui()
+            return
+
+        try:
+            server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+            server.starttls()
+            server.login(SENDER_EMAIL, SENDER_PASSWORD)
+        except Exception as e:
+            messagebox.showerror("Error", f"Mail server login failed: {e}")
+            self.reset_ui()
+            return
+
+        success_count = 0
+
+        for index, row in df.iterrows():
+            recipient_email = str(row["Email"]).strip()
+            recipient_name = str(row["Name"]).strip()
+            recipient_course = str(row["Course"]).strip()
+            cert_url = str(row["Certificate"]).strip()
+
+            if (
+                pd.isna(row["Email"])
+                or pd.isna(row["Name"])
+                or pd.isna(row["Course"])
+                or pd.isna(row["Certificate"])
+            ):
+                continue
+
+            final_subject = AUTOMATION_SUBJECT.replace(
+                "{Course}", recipient_course
+            ).replace("{Name}", recipient_name)
+            final_body = AUTOMATION_BODY_TEMPLATE.replace(
+                "{Course}", recipient_course
+            ).replace("{Name}", recipient_name)
+
+            msg = MIMEMultipart()
+            msg["From"] = SENDER_EMAIL
+            msg["To"] = recipient_email
+            msg["Subject"] = final_subject
+            msg.attach(MIMEText(final_body, "plain"))
+
             try:
-                with open(pdf_path, "rb") as f:
+                response = requests.get(cert_url, timeout=10)
+                if response.status_code == 200:
                     file_attachment = MIMEApplication(
-                        f.read(), _subtype="pdf"
+                        response.content, _subtype="pdf"
                     )
                     file_attachment.add_header(
                         "Content-Disposition",
                         "attachment",
-                        filename=f"{recipient_name}_Certificate.pdf",
+                        filename=f"{recipient_name.replace(' ', '_')}_Certificate.pdf",
                     )
                     msg.attach(file_attachment)
-            except Exception as e:
-                print(f"Skipping attachment index loop block: {e}")
+            except Exception:
+                continue
 
-        # Dispatch real network transmission package
-        try:
-            server.send_message(msg)
-            success_count += 1
-        except Exception as e:
-            print(f"Failed handling record transaction row index {index}: {e}")
+            try:
+                server.send_message(msg)
+                success_count += 1
+            except Exception:
+                pass
 
-    server.quit()
-    return f"Automation pipeline sequence finished! Dispatched to {success_count} unique recipients."
+        server.quit()
+        messagebox.showinfo(
+            "Success", f"Mail blast complete! Sent to {success_count} clients."
+        )
+        self.reset_ui()
 
+    def reset_ui(self):
+        self.upload_btn.config(text="📁 Upload Excel File")
+        self.execute_btn.config(state=tk.DISABLED, text="Execute Automation Blast")
+        self.status_label.config(text="Status: Waiting for file...")
+        self.file_path = ""
 
-# ==========================================
-# MINIMALIST HUGGING FACE UI ENGINE
-# ==========================================
-# Custom CSS stylesheet variables used to strip headers and mimic styling
-custom_theme_css = """
-footer {visibility: hidden !important;}
-#component-0 {max-width: 400px; margin: 100px auto !important; text-align: center;}
-"""
-
-with gr.Blocks(css=custom_theme_css, title="Bulk Mail System") as demo:
-
-    # File input box matching original clean layout aesthetics
-    excel_picker = gr.File(
-        label="Choose File", file_types=[".xlsx", ".xls", ".csv"]
-    )
-
-    # Action execution blast button
-    execute_btn = gr.Button(
-        "Execute Automation Blast", variant="primary", size="lg"
-    )
-
-    # Simple feedback line block to monitor execution output logs
-    log_status = gr.Textbox(label="Status output", interactive=False)
-
-    # Wire button to trigger the execution process
-    execute_btn.click(
-        fn=run_bulk_pipeline, inputs=excel_picker, outputs=log_status
-    )
 
 if __name__ == "__main__":
-    demo.launch()
+    root = tk.Tk()
+    app = BulkMailApp(root)
+    root.mainloop()
