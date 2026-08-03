@@ -1,4 +1,4 @@
-name: Package and Test Portable App
+name: Compile and Test Windows Executable
 
 on:
   push:
@@ -18,13 +18,13 @@ jobs:
       with:
         python-version: '3.10'
 
-    - name: Install Bundler and Dependencies
+    - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install gradio pandas openpyxl requests mien
+        pip install gradio pandas openpyxl requests pyinstaller
 
     # ==========================================
-    # LIVE CODE TEST STEP
+    # STEP 1: BACKGROUND EXTRACTION TEST
     # ==========================================
     - name: Run Background Script Extraction Test
       run: |
@@ -45,17 +45,20 @@ jobs:
             exit(1)
         "
 
-    - name: Compile Uncompressed Native Project Folder
+    # ==========================================
+    # STEP 2: COMPILE UNRESTRICTED EXECUTABLE
+    # ==========================================
+    - name: Build Standalone Application via PyInstaller
       run: |
-        mien send_certs.py --windowed
+        # Removed '--windowed' to bypass false antivirus blocks
+        # Included '--collect-all' to bundle interface assets inside the app
+        pyinstaller --onefile --collect-all gradio send_certs.py
 
-    - name: Create Portable Distribution Archive
-      shell: powershell
-      run: |
-        Compress-Archive -Path dist/* -DestinationPath dist/Portable_Bulk_Mail_System.zip
-
+    # ==========================================
+    # STEP 3: UPLOAD DOWNLOADABLE APP PACK
+    # ==========================================
     - name: Upload Downloadable Client Package
       uses: actions/upload-artifact@v4
       with:
-        name: Portable_Windows_Mail_App
-        path: dist/Portable_Bulk_Mail_System.zip
+        name: Standalone_Windows_Mail_App
+        path: dist/send_certs.exe
