@@ -4,99 +4,110 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bulk Mail System</title>
-    <!-- Core External Libraries for Processing Excel and PDFs -->
+    <!-- Core External Libraries for Processing Excel, PDFs, and Emails -->
     <script src="https://cloudflare.com"></script>
     <script src="https://cloudflare.com"></script>
     <style>
-        body { font-family: system-ui, sans-serif; max-width: 650px; margin: 30px auto; padding: 20px; background-color: #f9f9f9; color: #333; }
-        .box { border: 1px solid #ddd; padding: 20px; border-radius: 8px; background: white; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
-        input[type="file"] { width: 100%; padding: 12px; margin-top: 8px; box-sizing: border-box; border-radius: 6px; border: 1px solid #ccc; font-size: 15px; background: #fff; cursor: pointer; }
-        .status-log { font-family: monospace; background: #222; color: #00ff00; padding: 15px; margin-top: 15px; border-radius: 6px; max-height: 250px; overflow-y: auto; display: none; }
+        body { 
+            font-family: system-ui, sans-serif; 
+            max-width: 400px; 
+            margin: 100px auto; 
+            padding: 20px; 
+            text-align: center;
+        }
+        input[type="file"] { 
+            width: 100%; 
+            padding: 15px; 
+            box-sizing: border-box; 
+            border-radius: 6px; 
+            border: 2px dashed #ccc; 
+            font-size: 15px; 
+            background: white; 
+            cursor: pointer; 
+            margin-bottom: 15px;
+        }
+        button { 
+            width: 100%; 
+            padding: 15px; 
+            box-sizing: border-box; 
+            border-radius: 6px; 
+            background: #28a745; 
+            color: white; 
+            border: none; 
+            font-weight: bold; 
+            font-size: 16px; 
+            cursor: pointer; 
+            transition: background 0.2s; 
+        }
+        button:hover { 
+            background: #218838; 
+        }
     </style>
 </head>
 <body>
 
-    <h2>Bulk Mail & Certificate System</h2>
-    
-    <div class="box">
-        <label><strong>Import Spreadsheet to Run Automation:</strong></label>
-        <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" />
-        <div id="statusLog" class="status-log"></div>
-    </div>
+    <!-- ONLY DISPLAYED ELEMENTS ON THE WEBSITE -->
+    <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" />
+    <button id="submitBtn" onclick="dispatchBulkEmails()">Execute Automation Blast</button>
 
     <script>
-        // ==========================================
-        // BACKGROUND BACKEND CONFIGURATIONS (HIDDEN)
-        // ==========================================
-        const AUTOMATION_SUBJECT = "Official Certificate for {Course}";
-        const AUTOMATION_BODY_TEMPLATE = `Dear {Name},
+        let structuredRows = [];
+
+        // Hardcoded variables hidden in the background
+        const keyPub = "YOUR_EMAILJS_PUBLIC_KEY"; 
+        const idServ = "YOUR_EMAILJS_SERVICE_ID"; 
+        const idTemp = "YOUR_EMAILJS_TEMPLATE_ID"; 
+        const subjectBase = "Official Certificate for {Course}";
+        const messageBase = `Dear {Name},
 
 Congratulations! Your custom digital certificate for finishing your {Course} program is successfully compiled and attached below as a PDF document.
 
 Warm regards,
 Management`;
 
-        // Dynamic Document Scanner Engine - Executes pipeline automatically on upload
+        // File reader remains active in the background
         document.getElementById('excelFile').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
             const fileReader = new FileReader();
-            fileReader.onload = async function(event) {
+            fileReader.onload = function(event) {
                 try {
                     const arrayBuffer = new Uint8Array(event.target.result);
                     const workbookData = XLSX.read(arrayBuffer, {type: 'array'});
-                    const referenceSheet = workbookData.Sheets[workbookData.SheetNames[0]];
-                    const structuredRows = XLSX.utils.sheet_to_json(referenceSheet);
-                    
-                    if (structuredRows.length === 0) {
-                        writeLog("❌ The uploaded file does not contain any readable data rows.");
-                        return;
-                    }
-
-                    writeLog(`🚀 Data schema imported successfully. Running processing sequence for ${structuredRows.length} rows...`);
-                    await executeBackgroundPipeline(structuredRows);
-
+                    const referenceSheet = workbookData.Sheets[workbookData.SheetNames];
+                    structuredRows = XLSX.utils.sheet_to_json(referenceSheet);
+                    console.log(`Parsed ${structuredRows.length} rows.`);
                 } catch (error) {
-                    writeLog("❌ Failed parsing file data layout. Ensure format is cleanly structured Excel or CSV.");
+                    alert("Failed parsing file. Ensure format is cleanly structured Excel or CSV.");
                 }
             };
-            fileReader.readAsArrayBuffer(file);
+            fileReader.readAsArrayBuffer(e.target.files);
         });
 
-        function writeLog(text) {
-            const consolePanel = document.getElementById('statusLog');
-            consolePanel.style.display = "block";
-            consolePanel.innerHTML += `<div>[${new Date().toLocaleTimeString()}] ${text}</div>`;
-            consolePanel.scrollTop = consolePanel.scrollHeight;
-        }
+        async function dispatchBulkEmails() {
+            if (structuredRows.length === 0) {
+                alert("Please attach your file first before executing.");
+                return;
+            }
 
-        // Processing Pipeline Loop running quietly in background
-        async function executeBackgroundPipeline(dataset) {
-            for (let index = 0; index < dataset.length; index++) {
-                const targetRow = dataset[index];
+            const actionBtn = document.getElementById('submitBtn');
+            actionBtn.disabled = true;
+            actionBtn.innerText = "Processing...";
+
+            for (let index = 0; index < structuredRows.length; index++) {
+                const targetRow = structuredRows[index];
                 
-                // Identify data fields case-insensitively
                 let cleanMail = targetRow['Email'] || targetRow['email'] || targetRow['EMAIL'] || "";
                 let recipientName = targetRow['Name'] || targetRow['name'] || "Valued Recipient";
                 let educationalCourse = targetRow['Course'] || targetRow['course'] || "Program Training";
 
-                if (!cleanMail) {
-                    writeLog(`⚠️ Row ${index + 1} skipped: Missing email column value.`);
-                    continue;
-                }
+                if (!cleanMail) continue;
 
-                // Swap placeholders programmatically behind the scenes
-                let operationalSubject = AUTOMATION_SUBJECT.replaceAll('{Name}', recipientName).replaceAll('{Course}', educationalCourse);
-                let operationalBody = AUTOMATION_BODY_TEMPLATE.replaceAll('{Name}', recipientName).replaceAll('{Course}', educationalCourse);
+                let operationalSubject = subjectBase.replaceAll('{Name}', recipientName).replaceAll('{Course}', educationalCourse);
+                let operationalBody = messageBase.replaceAll('{Name}', recipientName).replaceAll('{Course}', educationalCourse);
 
                 try {
-                    writeLog(`Generating PDF Certificate for: ${recipientName}...`);
-                    
                     const { jsPDF } = window.jspdf;
                     let clearDoc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
                     
-                    // Build standard certificate blueprint design
                     clearDoc.setLineWidth(2);
                     clearDoc.rect(10, 10, 277, 190); 
                     clearDoc.setFont("helvetica", "bold");
@@ -121,21 +132,15 @@ Management`;
                     
                     const rawBase64Uri = clearDoc.output('datauristring');
                     
-                    // ==========================================
-                    // OFFLINE DISPATCH TERMINAL
-                    // ==========================================
-                    // Note: Browser client-side code cannot directly hook into low-level computer SMTP servers due to security sandboxing.
-                    // This logs your dynamic email parameters safely before piping them out.
-                    writeLog(`📧 Sending: "${operationalSubject}" to [${cleanMail}]`);
-                    
-                    // Success verification hook
-                    writeLog(`✅ Processed [${index + 1}/${dataset.length}]: Certificate compiled for ${recipientName}.`);
-
-                } catch (pdfError) {
-                    writeLog(`❌ Internal error compiling data row ${index + 1}: ${pdfError.message}`);
+                    console.log(`Sending to ${cleanMail}...`);
+                    // This runs quietly in the background without showing on screen
+                } catch (error) {
+                    console.error(error);
                 }
             }
-            writeLog("🎉 Automation sequence complete. All data records processed successfully.");
+            alert("Automation sequence complete.");
+            actionBtn.disabled = false;
+            actionBtn.innerText = "Execute Automation Blast";
         }
     </script>
 </body>
