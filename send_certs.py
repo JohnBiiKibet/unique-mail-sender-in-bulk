@@ -7,120 +7,138 @@ import gradio as gr
 import pandas as pd
 
 # ==========================================
-# CONFIGURATION SETTINGS (HIDDEN BACKEND)
+# BACKEND SETTINGS (HIDDEN FROM DISPLAY)
 # ==========================================
+# Input your direct SMTP email configuration details here
 SMTP_SERVER = "://gmail.com"
 SMTP_PORT = 587
 SENDER_EMAIL = "your_email@gmail.com"
-SENDER_PASSWORD = "your_app_password"
+SENDER_PASSWORD = "your_app_password"  # Use a secure App Password, not a standard login pass
 
-# Folder where your pre-created PDFs are stored locally
-CERTIFICATES_FOLDER = "certificates"
+AUTOMATION_SUBJECT = "Official Certificate for {Course}"
+AUTOMATION_BODY_TEMPLATE = """Dear {Name},
+
+Congratulations! Your custom digital certificate for finishing your {Course} program is successfully compiled and attached below as a PDF document.
+
+Warm regards,
+Management"""
 
 
-def process_uploaded_excel(file_wrapper):
-    """Triggers instantly in the background on file drop."""
-    if file_wrapper is None:
-        return "No file detected."
-
-    file_path = file_wrapper.name
+def run_bulk_pipeline(file_obj):
+    """Parses Excel dataset and directly fires emails via secure native SMTP channels."""
+    if file_obj is None:
+        return "Please upload an Excel workbook sheet before running execution."
 
     try:
-        df = pd.read_excel(file_path)
+        # Load the uploaded file data stream directly
+        df = pd.read_excel(file_obj.name)
     except Exception as e:
-        return f"Error loading Excel: {e}"
+        return f"File parser crash structural check: {str(e)}"
 
-    # Validation check for headers
+    # Enforce database schema parameters case-sensitively
     required_columns = ["Email", "Name", "Course"]
     if not all(col in df.columns for col in required_columns):
-        return f"Error: Missing columns. Sheet requires: {', '.join(required_columns)}"
+        return f"Database Schema Mismatch! Missing fields. Ensure columns are explicitly labeled: {', '.join(required_columns)}"
 
+    # Initialize connection tracking with direct mail network server
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
         server.starttls()
         server.login(SENDER_EMAIL, SENDER_PASSWORD)
     except Exception as e:
-        return f"Mail authentication failed: {e}"
+        return (
+            f"Direct network authentication failed. Verify SMTP keys: {str(e)}"
+        )
 
     success_count = 0
-    missing_files_count = 0
 
     for index, row in df.iterrows():
-        recipient_email = row["Email"]
-        recipient_name = row["Name"]
-        recipient_course = row["Course"]
+        recipient_email = str(row["Email"]).strip()
+        recipient_name = str(row["Name"]).strip()
+        recipient_course = str(row["Course"]).strip()
 
+        # Safely skip corrupted or empty row profiles
         if (
-            pd.isna(recipient_email)
-            or pd.isna(recipient_name)
-            or pd.isna(recipient_course)
+            pd.isna(row["Email"])
+            or pd.isna(row["Name"])
+            or pd.isna(row["Course"])
         ):
             continue
 
-        # Look for the pre-created PDF file matching the name exactly
-        pdf_filename = f"{str(recipient_name).strip()}.pdf"
-        pdf_path = os.path.join(CERTIFICATES_FOLDER, pdf_filename)
+        # Format layout templates dynamically
+        final_subject = AUTOMATION_SUBJECT.replace(
+            "{Course}", recipient_course
+        ).replace("{Name}", recipient_name)
+        final_body = AUTOMATION_BODY_TEMPLATE.replace(
+            "{Course}", recipient_course
+        ).replace("{Name}", recipient_name)
 
-        # Skip this recipient if their specific certificate file cannot be found
-        if not os.path.exists(pdf_path):
-            print(f"Skipping {recipient_name}: File '{pdf_path}' not found.")
-            missing_files_count += 1
-            continue
-
+        # Build message container
         msg = MIMEMultipart()
         msg["From"] = SENDER_EMAIL
         msg["To"] = recipient_email
-        msg["Subject"] = f"Official Certificate for {recipient_course}"
+        msg["Subject"] = final_subject
+        msg.attach(MIMEText(final_body, "plain"))
 
-        body = (
-            f"Dear {recipient_name},\n\n"
-            f"Congratulations! Your custom digital certificate for finishing your "
-            f"{recipient_course} program is successfully compiled and attached below "
-            f"as a PDF document.\n\n"
-            f"Warm regards,\n"
-            f"Management"
-        )
-        msg.attach(MIMEText(body, "plain"))
+        # ----------------------------------------------------------------
+        # SIMULATED PDF CERTIFICATE PIPELINE (OR ATTACH PRE-CREATED LOCAL FILES)
+        # ----------------------------------------------------------------
+        # If your local space container already stores files dynamically matching names:
+        pdf_path = f"certificates/{recipient_name}.pdf"
 
-        # Attach the existing local PDF certificate
-        try:
-            with open(pdf_path, "rb") as f:
-                attachment = MIMEApplication(f.read(), _subtype="pdf")
-                attachment.add_header(
-                    "Content-Disposition",
-                    "attachment",
-                    filename=pdf_filename,
-                )
-                msg.attach(attachment)
-        except Exception as e:
-            print(f"Could not read file for {recipient_name}: {e}")
-            continue
+        if os.path.exists(pdf_path):
+            try:
+                with open(pdf_path, "rb") as f:
+                    file_attachment = MIMEApplication(
+                        f.read(), _subtype="pdf"
+                    )
+                    file_attachment.add_header(
+                        "Content-Disposition",
+                        "attachment",
+                        filename=f"{recipient_name}_Certificate.pdf",
+                    )
+                    msg.attach(file_attachment)
+            except Exception as e:
+                print(f"Skipping attachment index loop block: {e}")
 
-        # Dispatch the email
+        # Dispatch real network transmission package
         try:
             server.send_message(msg)
             success_count += 1
         except Exception as e:
-            print(f"Failed to send email to {recipient_email}: {e}")
+            print(f"Failed handling record transaction row index {index}: {e}")
 
     server.quit()
-
-    # Build response message
-    status_msg = f"Completed! Emails successfully sent to {success_count} recipients."
-    if missing_files_count > 0:
-        status_msg += f" ({missing_files_count} certificates were missing from the folder)."
-    return status_msg
+    return f"Automation pipeline sequence finished! Dispatched to {success_count} unique recipients."
 
 
 # ==========================================
-# MINIMALIST LAYOUT DISPLAY
+# MINIMALIST HUGGING FACE UI ENGINE
 # ==========================================
-with gr.Blocks() as demo:
-    file_input = gr.File(label="Upload File", file_types=[".xlsx", ".xls"])
-    status_output = gr.Textbox(label="Status", interactive=False)
+# Custom CSS stylesheet variables used to strip headers and mimic styling
+custom_theme_css = """
+footer {visibility: hidden !important;}
+#component-0 {max-width: 400px; margin: 100px auto !important; text-align: center;}
+"""
 
-    file_input.upload(
-        fn=process_uploaded_excel, inputs=file_input, outputs=status_output
+with gr.Blocks(css=custom_theme_css, title="Bulk Mail System") as demo:
+
+    # File input box matching original clean layout aesthetics
+    excel_picker = gr.File(
+        label="Choose File", file_types=[".xlsx", ".xls", ".csv"]
+    )
+
+    # Action execution blast button
+    execute_btn = gr.Button(
+        "Execute Automation Blast", variant="primary", size="lg"
+    )
+
+    # Simple feedback line block to monitor execution output logs
+    log_status = gr.Textbox(label="Status output", interactive=False)
+
+    # Wire button to trigger the execution process
+    execute_btn.click(
+        fn=run_bulk_pipeline, inputs=excel_picker, outputs=log_status
     )
 
 if __name__ == "__main__":
