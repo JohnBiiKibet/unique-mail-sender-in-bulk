@@ -87,27 +87,35 @@ Congratulations! Your custom digital certificate for finishing your {Course} pro
 Warm regards,
 Management`;
 
-        // File reader remains active in the background
-        document.getElementById('excelFile').addEventListener('change', function(e) {
-            if (e.target.files.length === 0) return;
+        // FIXED: Modern Async Event Listener for processing Excel correctly
+        document.getElementById('excelFile').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
             
-            const fileReader = new FileReader();
-            fileReader.onload = function(event) {
-                try {
-                    const arrayBuffer = new Uint8Array(event.target.result);
-                    const workbookData = XLSX.read(arrayBuffer, {type: 'array'});
-                    const referenceSheet = workbookData.Sheets[workbookData.SheetNames];
-                    structuredRows = XLSX.utils.sheet_to_json(referenceSheet);
-                    
-                    // Show the cancel button once a valid file is loaded
+            try {
+                // Read file directly into an ArrayBuffer
+                const arrayBuffer = await file.arrayBuffer();
+                const workbookData = XLSX.read(arrayBuffer, { type: 'array' });
+                
+                // FIXED: Explicitly grab the first spreadsheet tab [0]
+                const firstSheetName = workbookData.SheetNames[0];
+                const referenceSheet = workbookData.Sheets[firstSheetName];
+                
+                // Parse rows cleanly to arrays
+                structuredRows = XLSX.utils.sheet_to_json(referenceSheet);
+                
+                if (structuredRows.length > 0) {
                     document.getElementById('cancelBtn').style.display = "block";
-                    console.log(`Parsed ${structuredRows.length} rows.`);
-                } catch (error) {
-                    alert("Failed parsing file. Ensure format is cleanly structured Excel or CSV.");
+                    console.log(`Parsed ${structuredRows.length} rows successfully.`);
+                } else {
+                    alert("The uploaded Excel file appears to be completely empty.");
                     cancelUploadedFile();
                 }
-            };
-            fileReader.readAsArrayBuffer(e.target.files);
+            } catch (error) {
+                alert("Failed parsing file. Ensure format is cleanly structured Excel or CSV.");
+                console.error(error);
+                cancelUploadedFile();
+            }
         });
 
         // Function to reset selection and delete memory data
@@ -115,7 +123,6 @@ Management`;
             document.getElementById('excelFile').value = ""; // Clear file layout
             structuredRows = []; // Wipe arrays from hidden memory
             document.getElementById('cancelBtn').style.display = "none"; // Hide button again
-            alert("File upload canceled and memory cleared.");
         }
 
         async function dispatchBulkEmails() {
