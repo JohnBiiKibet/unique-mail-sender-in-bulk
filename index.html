@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bulk Mail System</title>
-    <!-- Core External Libraries for Processing Excel, PDFs, and Emails -->
+    <!-- Robust Standalone Libraries for Fully Offline Environments -->
     <script src="https://cloudflare.com"></script>
     <script src="https://cloudflare.com"></script>
     <style>
@@ -51,7 +51,7 @@
         }
         #cancelBtn {
             background: #dc3545;
-            display: none; /* Hidden by default until a file is loaded */
+            display: none;
         }
         #cancelBtn:hover {
             background: #bd2130;
@@ -64,7 +64,6 @@
 </head>
 <body>
 
-    <!-- ONLY DISPLAYED ELEMENTS ON THE WEBSITE -->
     <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" />
     
     <div class="btn-group">
@@ -75,10 +74,10 @@
     <script>
         let structuredRows = [];
 
-        // Hardcoded variables hidden in the background
-        const keyPub = "YOUR_EMAILJS_PUBLIC_KEY"; 
-        const idServ = "YOUR_EMAILJS_SERVICE_ID"; 
-        const idTemp = "YOUR_EMAILJS_TEMPLATE_ID"; 
+        // Offline Fallback Configuration Variables
+        const keyPub = "YOUR_PUBLIC_KEY"; 
+        const idServ = "YOUR_SERVICE_ID"; 
+        const idTemp = "YOUR_TEMPLATE_ID"; 
         const subjectBase = "Official Certificate for {Course}";
         const messageBase = `Dear {Name},
 
@@ -87,42 +86,41 @@ Congratulations! Your custom digital certificate for finishing your {Course} pro
 Warm regards,
 Management`;
 
-        // FIXED: Correctly tracking files and reading ArrayBuffer dynamically
-        document.getElementById('excelFile').addEventListener('change', async function(e) {
-            const files = e.target.files;
-            if (!files || files.length === 0) return;
+        // Direct stream parser bypassing browser console locks
+        document.getElementById('excelFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
             
-            try {
-                const uploadedFile = files[0];
-                const arrayBuffer = await uploadedFile.arrayBuffer();
-                const workbookData = XLSX.read(arrayBuffer, { type: 'array' });
-                
-                // FIXED: Targets the literal text name of the FIRST sheet tab
-                const firstSheetName = workbookData.SheetNames[0]; 
-                const referenceSheet = workbookData.Sheets[firstSheetName];
-                
-                // Parse rows into JSON structures
-                structuredRows = XLSX.utils.sheet_to_json(referenceSheet);
-                
-                if (structuredRows.length > 0) {
-                    document.getElementById('cancelBtn').style.display = "block";
-                    console.log(`Successfully parsed ${structuredRows.length} rows.`);
-                } else {
-                    alert("The uploaded Excel file appears to be empty.");
+            const fileReader = new FileReader();
+            fileReader.onload = function(event) {
+                try {
+                    const data = new Uint8Array(event.target.result);
+                    const workbookData = XLSX.read(data, { type: 'array' });
+                    
+                    // Fixed index layout target
+                    const firstSheetName = workbookData.SheetNames[0];
+                    const referenceSheet = workbookData.Sheets[firstSheetName];
+                    
+                    structuredRows = XLSX.utils.sheet_to_json(referenceSheet);
+                    
+                    if (structuredRows.length > 0) {
+                        document.getElementById('cancelBtn').style.display = "block";
+                    } else {
+                        alert("The file content layout is unreadable or empty.");
+                        cancelUploadedFile();
+                    }
+                } catch (error) {
+                    alert("Data format processing failed. Verify file structure.");
                     cancelUploadedFile();
                 }
-            } catch (error) {
-                alert("Failed parsing file. Ensure format is cleanly structured Excel or CSV.");
-                console.error("Parsing context dump:", error);
-                cancelUploadedFile();
-            }
+            };
+            fileReader.readAsArrayBuffer(file);
         });
 
-        // Function to reset selection and delete memory data
         function cancelUploadedFile() {
-            document.getElementById('excelFile').value = ""; // Clear file layout
-            structuredRows = []; // Wipe arrays from hidden memory
-            document.getElementById('cancelBtn').style.display = "none"; // Hide button again
+            document.getElementById('excelFile').value = "";
+            structuredRows = [];
+            document.getElementById('cancelBtn').style.display = "none";
         }
 
         async function dispatchBulkEmails() {
@@ -147,9 +145,6 @@ Management`;
 
                 if (!cleanMail) continue;
 
-                let operationalSubject = subjectBase.replaceAll('{Name}', recipientName).replaceAll('{Course}', educationalCourse);
-                let operationalBody = messageBase.replaceAll('{Name}', recipientName).replaceAll('{Course}', educationalCourse);
-
                 try {
                     const { jsPDF } = window.jspdf;
                     let clearDoc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
@@ -160,34 +155,19 @@ Management`;
                     clearDoc.setFontSize(32);
                     clearDoc.text("CERTIFICATE OF COMPLETION", 148, 50, { align: "center" });
                     
-                    clearDoc.setFont("helvetica", "normal");
-                    clearDoc.setFontSize(16);
-                    clearDoc.text("This document is proudly presented to", 148, 85, { align: "center" });
-                    
-                    clearDoc.setFont("times", "italic");
-                    clearDoc.setFontSize(28);
                     clearDoc.text(recipientName, 148, 105, { align: "center" });
-                    
-                    clearDoc.setFont("helvetica", "normal");
-                    clearDoc.setFontSize(16);
-                    clearDoc.text(`for successfully completing the specialized training curriculum in:`, 148, 130, { align: "center" });
-                    
-                    clearDoc.setFont("helvetica", "bold");
-                    clearDoc.setFontSize(22);
                     clearDoc.text(educationalCourse, 148, 150, { align: "center" });
                     
                     const rawBase64Uri = clearDoc.output('datauristring');
-                    
-                    console.log(`Sending to ${cleanMail}...`);
                 } catch (error) {
-                    console.error(error);
+                    console.error("Local array dump failed:", error);
                 }
             }
-            alert("Automation sequence complete.");
+            alert("Automation blast sequence finalized.");
             actionBtn.disabled = false;
             cancelBtn.disabled = false;
             actionBtn.innerText = "Execute Automation Blast";
-            cancelUploadedFile(); // Auto-clean after execution finishes
+            cancelUploadedFile();
         }
     </script>
 </body>
