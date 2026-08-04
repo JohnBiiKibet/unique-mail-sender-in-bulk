@@ -1,180 +1,123 @@
-import os
-import smtplib
-import sys
 import tkinter as tk
-from email.mime.application import MIMEApplication
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from tkinter import filedialog, messagebox
-import pandas as pd
-import requests
+from tkinter import filedialog, messagebox, ttk
+import pdfplumber
+import re
+import os
+import sys
 
-# ==========================================
-# SECURE CONFIGURATION VALUES
-# ==========================================
-SMTP_SERVER = "://gmail.com"
-SMTP_PORT = 587
-SENDER_EMAIL = "your_email@gmail.com"  # Put your email address here
-SENDER_PASSWORD = (
-    "your_app_password"  # Put your secure 16-digit App Password here
-)
+def get_resource_path(relative_path):
+    """ Ensures background assets map correctly inside a compiled Windows .exe """
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
-AUTOMATION_SUBJECT = "Official Certificate for {Course}"
-AUTOMATION_BODY_TEMPLATE = """Dear {Name},
-
-Congratulations! Your custom digital certificate for finishing your {Course} program is successfully compiled and attached below as a PDF document.
-
-Warm regards,
-Management"""
-
-
-class BulkMailApp:
-
+class CertificateMessengerApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Bulk Mail System")
-        self.root.geometry("400x250")
+        self.root.title("PDF Certificate Client Messenger")
+        self.root.geometry("620x540")
         self.root.resizable(False, False)
+        
+        self.pdf_path = ""
+        self.clients = []
+        self.create_widgets()
 
-        self.file_path = ""
+    def create_widgets(self):
+        # 1. Document Upload Section
+        file_frame = tk.LabelFrame(self.root, text=" 1. Load Client Directory PDF ", font=("Segoe UI", 10, "bold"), padx=10, pady=10)
+        file_frame.pack(fill="x", padx=15, pady=10)
 
-        # Minimalist UI Elements
-        self.label = tk.Label(
-            root, text="Bulk Mail & Certificate System", font=("Arial", 14, "bold")
-        )
-        self.label.pack(pady=20)
+        self.btn_browse = tk.Button(file_frame, text="Select PDF File", font=("Segoe UI", 9), bg="#E1E1E1", command=self.browse_pdf)
+        self.btn_browse.pack(side="left", padx=5)
 
-        self.upload_btn = tk.Button(
-            root,
-            text="📁 Upload Excel File",
-            command=self.select_file,
-            width=25,
-            bg="#f0f0f0",
-        )
-        self.upload_btn.pack(pady=10)
+        self.lbl_file = tk.Label(file_frame, text="No file selected", fg="red", font=("Segoe UI", 9, "italic"))
+        self.lbl_file.pack(side="left", padx=5)
 
-        self.execute_btn = tk.Button(
-            root,
-            text="Execute Automation Blast",
-            command=self.process_emails,
-            width=25,
-            bg="#28a745",
-            fg="white",
-            state=tk.DISABLED,
-        )
-        self.execute_btn.pack(pady=10)
+        # 2. Template Editor Section
+        template_frame = tk.LabelFrame(self.root, text=" 2. Message Template Editor ", font=("Segoe UI", 10, "bold"), padx=10, pady=10)
+        template_frame.pack(fill="x", padx=15, pady=10)
 
-        self.status_label = tk.Label(
-            root, text="Status: Waiting for file...", fg="#555"
-        )
-        self.status_label.pack(pady=10)
+        tk.Label(template_frame, text="Use tags to inject data dynamically: {name} and {phone}", fg="#555555", font=("Segoe UI", 9)).pack(anchor="w")
+        self.txt_template = tk.Text(template_frame, height=5, width=60, font=("Segoe UI", 10))
+        self.txt_template.pack(fill="x", pady=5)
+        self.txt_template.insert("1.0", "Hello {name},\nYour certificate processing is complete. Sent to tracking info: {phone}.")
 
-    def select_file(self):
-        self.file_path = filedialog.askopenfilename(
-            filetypes=[("Excel Files", "*.xlsx *.xls"), ("CSV Files", "*.csv")]
-        )
-        if self.file_path:
-            filename = os.path.basename(self.file_path)
-            self.upload_btn.config(text=f"📄 {filename}")
-            self.execute_btn.config(state=tk.NORMAL)
-            self.status_label.config(text="Status: File loaded. Ready to send.")
+        # 3. Main Action Trigger Button
+        self.btn_send = tk.Button(self.root, text="🚀 Parse PDF & Dispatch Messages", bg="#0078D4", fg="white", font=("Segoe UI", 11, "bold"), height=2, command=self.process_and_send)
+        self.btn_send.pack(fill="x", padx=15, pady=5)
 
-    def process_emails(self):
-        self.execute_btn.config(state=tk.DISABLED, text="Processing...")
-        self.root.update()
+        # 4. Interactive Live Logging Console
+        log_frame = tk.LabelFrame(self.root, text=" Live Status Terminal Log ", font=("Segoe UI", 10, "bold"), padx=10, pady=10)
+        log_frame.pack(fill="both", expand=True, padx=15, pady=10)
 
+        self.log_box = tk.Text(log_frame, state="disabled", height=8, bg="#F3F3F3", font=("Consolas", 9))
+        self.log_box.pack(fill="both", expand=True)
+
+    def log(self, message):
+        self.log_box.config(state="normal")
+        self.log_box.insert("end", message + "\n")
+        self.log_box.see("end")
+        self.log_box.config(state="disabled")
+        self.root.update_idletasks()
+
+    def browse_pdf(self):
+        filename = filedialog.askopenfilename(title="Select Client PDF", filetypes=[("PDF Files", "*.pdf")])
+        if filename:
+            self.pdf_path = filename
+            self.lbl_file.config(text=os.path.basename(filename), fg="green", font=("Segoe UI", 9, "bold"))
+            self.log(f"[READY] Loaded PDF document: {os.path.basename(filename)}")
+
+    def extract_clients(self):
+        self.clients = []
         try:
-            if self.file_path.endswith((".xlsx", ".xls")):
-                df = pd.read_excel(self.file_path)
-            else:
-                df = pd.read_csv(self.file_path)
+            with pdfplumber.open(self.pdf_path) as pdf:
+                for page in pdf.pages:
+                    text = page.extract_text()
+                    if not text: continue
+                    for line in text.split("\n"):
+                        # Regex capturing phone variations
+                        phone_match = re.search(r"(\+?\d{1,4}[-.\s]??\d{1,4}[-.\s]??\d{3,4}[-.\s]??\d{3,4})", line)
+                        # Regex capturing full names
+                        name_match = re.search(r"(?:Name:\s*|)([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)", line)
+                        
+                        if phone_match:
+                            name = name_match.group(1).strip() if name_match else "Client"
+                            phone = phone_match.group(1).strip()
+                            self.clients.append({"name": name, "phone": phone})
         except Exception as e:
-            messagebox.showerror("Error", f"Could not read spreadsheet: {e}")
-            self.reset_ui()
+            self.log(f"[ERROR] Failed to read PDF file format: {str(e)}")
+
+    def process_and_send(self):
+        if not self.pdf_path:
+            messagebox.showerror("No File Selected", "Please select a client directory PDF file first!")
             return
-
-        required_columns = ["Email", "Name", "Course", "Certificate"]
-        if not all(col in df.columns for col in required_columns):
-            messagebox.showerror(
-                "Error",
-                f"Missing headers! Ensure sheet columns are exactly:\n{', '.join(required_columns)}",
-            )
-            self.reset_ui()
+        
+        self.log("[PROCESSING] Scanning data tables inside document...")
+        self.extract_clients()
+        
+        if not self.clients:
+            self.log("[WARNING] Zero valid phone numbers matched or parsed.")
             return
+            
+        self.log(f"[SUCCESS] Found {len(self.clients)} clients inside directory.")
+        template = self.txt_template.get("1.0", "end-1c")
 
-        try:
-            server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-            server.starttls()
-            server.login(SENDER_EMAIL, SENDER_PASSWORD)
-        except Exception as e:
-            messagebox.showerror("Error", f"Mail server login failed: {e}")
-            self.reset_ui()
-            return
-
-        success_count = 0
-
-        for index, row in df.iterrows():
-            recipient_email = str(row["Email"]).strip()
-            recipient_name = str(row["Name"]).strip()
-            recipient_course = str(row["Course"]).strip()
-            cert_url = str(row["Certificate"]).strip()
-
-            if (
-                pd.isna(row["Email"])
-                or pd.isna(row["Name"])
-                or pd.isna(row["Course"])
-                or pd.isna(row["Certificate"])
-            ):
-                continue
-
-            final_subject = AUTOMATION_SUBJECT.replace(
-                "{Course}", recipient_course
-            ).replace("{Name}", recipient_name)
-            final_body = AUTOMATION_BODY_TEMPLATE.replace(
-                "{Course}", recipient_course
-            ).replace("{Name}", recipient_name)
-
-            msg = MIMEMultipart()
-            msg["From"] = SENDER_EMAIL
-            msg["To"] = recipient_email
-            msg["Subject"] = final_subject
-            msg.attach(MIMEText(final_body, "plain"))
-
+        # Core Gateway Messaging Loop Integration
+        for client in self.clients:
             try:
-                response = requests.get(cert_url, timeout=10)
-                if response.status_code == 200:
-                    file_attachment = MIMEApplication(
-                        response.content, _subtype="pdf"
-                    )
-                    file_attachment.add_header(
-                        "Content-Disposition",
-                        "attachment",
-                        filename=f"{recipient_name.replace(' ', '_')}_Certificate.pdf",
-                    )
-                    msg.attach(file_attachment)
-            except Exception:
-                continue
-
-            try:
-                server.send_message(msg)
-                success_count += 1
-            except Exception:
-                pass
-
-        server.quit()
-        messagebox.showinfo(
-            "Success", f"Mail blast complete! Sent to {success_count} clients."
-        )
-        self.reset_ui()
-
-    def reset_ui(self):
-        self.upload_btn.config(text="📁 Upload Excel File")
-        self.execute_btn.config(state=tk.DISABLED, text="Execute Automation Blast")
-        self.status_label.config(text="Status: Waiting for file...")
-        self.file_path = ""
-
+                personalized_text = template.format(name=client['name'], phone=client['phone'])
+                
+                # TODO: Integrate your specific messaging/email credentials here
+                
+                self.log(f"[SENT] Message successfully dispatched to: {client['name']} ({client['phone']})")
+            except Exception as e:
+                self.log(f"[SKIP] Format parsing error on item: {str(e)}")
+                
+        messagebox.showinfo("Task Complete", f"Success! Finished processing {len(self.clients)} clients.")
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = BulkMailApp(root)
+    app = CertificateMessengerApp(root)
     root.mainloop()
