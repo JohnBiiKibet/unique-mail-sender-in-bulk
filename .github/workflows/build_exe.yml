@@ -1,4 +1,0 @@
-git add send_certs.py requirements.txt .github/workflows/build_exe.yml
-git commit -m "Migrated engine to Tkinter desktop layout"
-git tag v1.0.0
-git push origin main --tags
