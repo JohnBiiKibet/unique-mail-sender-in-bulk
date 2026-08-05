@@ -78,17 +78,29 @@ class CertificateMessengerApp:
             with pdfplumber.open(self.pdf_path) as pdf:
                 for i, page in enumerate(pdf.pages):
                     text = page.extract_text()
-                    if not text: continue
+                    if not text: 
+                        continue
+                    
                     for line in text.split("\n"):
-                        # Regex targets standard global/local phone number sequences
-                        phone_match = re.search(r"(\+?\d{1,4}[-.\s]??\d{1,4}[-.\s]??\d{3,4}[-.\s]??\d{3,4})", line)
-                        # Regex captures adjacent capitalized names (e.g., "John Doe")
-                        name_match = re.search(r"(?:Name:\s*|)([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)", line)
+                        # Clean whitespaces
+                        line = line.strip()
+                        if not line:
+                            continue
                         
+                        # Robust phone pattern: matches +country code, spaces, hyphens, and 7-15 digits
+                        phone_match = re.search(r"(\+?\d{1,4}[-.\s]?\(?\d{1,3}?\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4})", line)
+                        
+                        # Look for 'Name: John Doe' or explicit capital word clusters at start/middle
+                        name_match = re.search(r"(?:Name:\s*)([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)+)", line, re.IGNORECASE)
+                        if not name_match:
+                            # Fallback pattern if 'Name:' label is completely missing
+                            name_match = re.search(r"^([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)+)", line)
+
                         if phone_match:
-                            name = name_match.group(1).strip() if name_match else "Client"
                             phone = phone_match.group(1).strip()
+                            name = name_match.group(1).strip() if name_match else "Client"
                             self.clients.append({"name": name, "phone": phone})
+                            
         except Exception as e:
             self.log(f"[ERROR] PDF processing failed: {str(e)}")
             messagebox.showerror("Processing Failed", f"PDF formatting parse failed.\nSystem Error Log: {str(e)}")
@@ -103,6 +115,7 @@ class CertificateMessengerApp:
         
         if not self.clients:
             self.log("[WARNING] Zero phone number profiles matched or parsed.")
+            messagebox.showwarning("No Data Found", "Could not find valid names/phone records in this PDF configuration.")
             return
             
         self.log(f"[SUCCESS] Extracted {len(self.clients)} records out of your PDF file.")
