@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF Client Certificate Messenger</title>
-    <!-- Modern stable client-side parsing Engine -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <title>Multi-Doc Client Certificate Messenger</title>
+    <!-- Engines: PDF.js for PDF files & Mammoth.js for Word (.docx) files -->
+    <script src="https://cloudflare.com"></script>
+    <script src="https://cloudflare.com"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -47,7 +48,6 @@
             align-items: center;
             gap: 10px;
         }
-        /* Fixed clickable label configuration bounds */
         .custom-file-upload {
             display: inline-block;
             background-color: #E1E1E1;
@@ -120,15 +120,15 @@
 <body>
 
 <div class="app-container">
-    <h2>PDF Client Certificate Messenger</h2>
+    <h2>Multi-Doc Client Certificate Messenger</h2>
 
     <!-- 1. Document Upload Section -->
     <fieldset>
-        <legend> 1. Load Your Client Directory PDF </legend>
+        <legend> 1. Load Your Client Directory (PDF or Word DOCX) </legend>
         <div class="file-input-container">
-            <!-- Fixed explicitly linked trigger binding -->
-            <label for="pdfFile" class="custom-file-upload">Browse & Upload PDF</label>
-            <input type="file" id="pdfFile" accept="application/pdf" style="display: none;">
+            <label for="docFile" class="custom-file-upload">Browse & Upload Document</label>
+            <!-- Adjusted accept filter string to accept both file type nodes -->
+            <input type="file" id="docFile" accept="application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display: none;">
             <span id="fileStatus" class="file-status">No file selected</span>
         </div>
     </fieldset>
@@ -151,11 +151,10 @@
 </div>
 
 <script>
-    // Set explicit worker fallback engine properties
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cloudflare.com';
 
     let extractedClients = [];
-    const fileInput = document.getElementById('pdfFile');
+    const fileInput = document.getElementById('docFile');
     const fileStatus = document.getElementById('fileStatus');
     const logBox = document.getElementById('logBox');
     const btnSend = document.getElementById('btnSend');
@@ -166,40 +165,52 @@
         logBox.scrollTop = logBox.scrollHeight;
     }
 
-    // Capture standard file object arrays correctly
     fileInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (file) {
             fileStatus.textContent = file.name;
             fileStatus.className = "file-status loaded";
             extractedClients = []; 
-            log(`[READY] Loaded PDF document: ${file.name}`);
+            log(`[READY] Loaded file: ${file.name}`);
         }
     });
 
     btnSend.addEventListener('click', async function() {
         const file = fileInput.files[0];
         if (!file) {
-            alert("Please upload a client PDF first!");
+            alert("Please upload a document first!");
             return;
         }
 
-        log("[PROCESSING] Scanning data layers inside PDF document...");
+        log(`[PROCESSING] Scanning text data layers inside: ${file.name}...`);
         
-        try {
-            const fileReader = new FileReader();
-            fileReader.onload = async function() {
+        // Handle PDF Files
+        if (file.type === "application/pdf" || file.name.endsWith('.pdf')) {
+            processPDF(file);
+        } 
+        // Handle Word DOCX Files
+        else if (file.name.endsWith('.docx')) {
+            processWord(file);
+        } 
+        else {
+            log("[ERROR] Unsupported file extension format.");
+            alert("Please upload a valid .pdf or .docx file extension structure.");
+        }
+    });
+
+    // --- PDF Extractor Logic ---
+    function processPDF(file) {
+        const fileReader = new FileReader();
+        fileReader.onload = async function() {
+            try {
                 const typedarray = new Uint8Array(this.result);
                 const pdf = await pdfjsLib.getDocument(typedarray).promise;
-                
                 extractedClients = [];
                 
-                // Read and cycle content strings completely
                 for (let i = 1; i <= pdf.numPages; i++) {
                     const page = await pdf.getPage(i);
                     const textContent = await page.getTextContent();
                     
-                    // Reconstruct text blocks by structural lines
                     let lines = {};
                     textContent.items.forEach(item => {
                         let y = Math.round(item.transform[5]); 
@@ -208,58 +219,65 @@
                     });
 
                     let sortedY = Object.keys(lines).sort((a, b) => b - a);
-                    
                     sortedY.forEach(y => {
                         let lineStr = lines[y].join(" ").trim();
-                        if (!lineStr) return;
-
-                        // Robust extraction parameters
-                        const phoneRegex = /(\+?\d{1,4}[-.\s]?\(?\d{1,3}?\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4})/;
-                        const nameRegex = /(?:Name:\s*)([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)+)/i;
-                        const fallbackNameRegex = /^([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)+)/;
-
-                        const phoneMatch = lineStr.match(phoneRegex);
-                        if (phoneMatch) {
-                            let phone = phoneMatch[0].trim();
-                            let nameMatch = lineStr.match(nameRegex) || lineStr.match(fallbackNameRegex);
-                            let name = nameMatch ? nameMatch[1].trim() : "Client";
-                            
-                            extractedClients.push({ name: name, phone: phone });
-                        }
+                        parseLineData(lineStr);
                     });
                 }
-
-                if (extractedClients.length === 0) {
-                    log("[WARNING] Zero phone number profiles matched or parsed.");
-                    alert("Could not find valid names/phone records in this PDF configuration.");
-                    return;
-                }
-
-                log(`[SUCCESS] Extracted ${extractedClients.length} records out of your PDF file.`);
-                executeMessageBlast();
-            };
-            
-            fileReader.readAsArrayBuffer(file);
-        } catch (error) {
-            log(`[ERROR] PDF processing failed: ${error.message}`);
-            alert(`PDF formatting parse failed.\nSystem Error: ${error.message}`);
-        }
-    });
-
-    function executeMessageBlast() {
-        const template = msgTemplate.value;
-        
-        extractedClients.forEach(client => {
-            let personalizedText = template.replace(/{name}/g, client.name).replace(/{phone}/g, client.phone);
-            
-            // TODO: Append your preferred browser Fetch/Axios API communication integrations here.
-            
-            log(`[SENT] Message successfully blasted to: ${client.name} (${client.phone})`);
-        });
-
-        alert(`Success! Finished running automation blast on ${extractedClients.length} records.`);
+                finalizeExtraction();
+            } catch (error) {
+                log(`[ERROR] PDF parsing failed: ${error.message}`);
+            }
+        };
+        fileReader.readAsArrayBuffer(file);
     }
-</script>
 
-</body>
-</html>
+    // --- Word DOCX Extractor Logic ---
+    function processWord(file) {
+        const fileReader = new FileReader();
+        fileReader.onload = function(e) {
+            const arrayBuffer = e.target.result;
+            
+            // Reconstruct plain text rows out of Word processing schemas via Mammoth
+            mammoth.extractRawText({ arrayBuffer: arrayBuffer })
+                .then(function(result) {
+                    const fullText = result.value; 
+                    extractedClients = [];
+                    
+                    // Split the raw text string block cleanly by line breaks
+                    const lines = fullText.split('\n');
+                    lines.forEach(line => {
+                        parseLineData(line.trim());
+                    });
+                    
+                    finalizeExtraction();
+                })
+                .catch(function(error) {
+                    log(`[ERROR] Word parsing failed: ${error.message}`);
+                    alert(`Word content extraction error: ${error.message}`);
+                });
+        };
+        fileReader.readAsArrayBuffer(file);
+    }
+
+    // --- Regular Expression Parser Routing ---
+    function parseLineData(lineStr) {
+        if (!lineStr) return;
+
+        const phoneRegex = /(\+?\d{1,4}[-.\s]?\(?\d{1,3}?\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4})/;
+        const nameRegex = /(?:Name:\s*)([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)+)/i;
+        const fallbackNameRegex = /^([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)+)/;
+
+        const phoneMatch = lineStr.match(phoneRegex);
+        if (phoneMatch) {
+            let phone = phoneMatch[0].trim();
+            let nameMatch = lineStr.match(nameRegex) || lineStr.match(fallbackNameRegex);
+            let name = nameMatch ? nameMatch[1] || nameMatch[0] : "Client";
+            
+            extractedClients.push({ name: name.trim(), phone: phone });
+        }
+    }
+
+    function finalizeExtraction() {
+        if (extractedClients.length === 0) {
+            log("[WARNING] Zero phone number profiles matched or parsed.");
