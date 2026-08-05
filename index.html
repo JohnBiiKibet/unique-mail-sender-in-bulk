@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Multi-Doc Client Certificate Messenger</title>
-    <!-- Engines: PDF.js for PDF files & Mammoth.js for Word (.docx) files -->
+    <!-- Stable Engines via CDN -->
     <script src="https://cloudflare.com"></script>
     <script src="https://cloudflare.com"></script>
     <style>
@@ -127,8 +127,7 @@
         <legend> 1. Load Your Client Directory (PDF or Word DOCX) </legend>
         <div class="file-input-container">
             <label for="docFile" class="custom-file-upload">Browse & Upload Document</label>
-            <!-- Adjusted accept filter string to accept both file type nodes -->
-            <input type="file" id="docFile" accept="application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display: none;">
+            <input type="file" id="docFile" accept=".pdf, .docx, application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display: none;">
             <span id="fileStatus" class="file-status">No file selected</span>
         </div>
     </fieldset>
@@ -137,7 +136,7 @@
     <fieldset>
         <legend> 2. Message Template Editor </legend>
         <div class="hint-text">Use tags to inject data dynamically: {name} and {phone}</div>
-        <textarea id="msgTemplate">Hello {name},&#10;Your certificate processing is complete. Sent to tracking info: {phone}.</textarea>
+        <textarea id="msgTemplate">Hello {name},\nYour certificate processing is complete. Sent to tracking info: {phone}.</textarea>
     </fieldset>
 
     <!-- 3. Main Action Trigger Button -->
@@ -166,35 +165,36 @@
     }
 
     fileInput.addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (file) {
-            fileStatus.textContent = file.name;
+        const files = e.target.files;
+        if (files && files.length > 0) {
+            fileStatus.textContent = files[0].name;
             fileStatus.className = "file-status loaded";
             extractedClients = []; 
-            log(`[READY] Loaded file: ${file.name}`);
+            log(`[READY] Loaded file: ${files[0].name}`);
         }
     });
 
     btnSend.addEventListener('click', async function() {
-        const file = fileInput.files[0];
-        if (!file) {
+        const files = fileInput.files;
+        if (!files || files.length === 0) {
             alert("Please upload a document first!");
             return;
         }
 
+        const file = files[0];
+        const fileNameLower = file.name.toLowerCase();
         log(`[PROCESSING] Scanning text data layers inside: ${file.name}...`);
         
-        // Handle PDF Files
-        if (file.type === "application/pdf" || file.name.endsWith('.pdf')) {
+        // Fixed: Check file extension directly instead of relying solely on browser MIME type
+        if (fileNameLower.endsWith('.pdf')) {
             processPDF(file);
         } 
-        // Handle Word DOCX Files
-        else if (file.name.endsWith('.docx')) {
+        else if (fileNameLower.endsWith('.docx')) {
             processWord(file);
         } 
         else {
             log("[ERROR] Unsupported file extension format.");
-            alert("Please upload a valid .pdf or .docx file extension structure.");
+            alert("Please upload a valid .pdf or .docx file.");
         }
     });
 
@@ -238,13 +238,11 @@
         fileReader.onload = function(e) {
             const arrayBuffer = e.target.result;
             
-            // Reconstruct plain text rows out of Word processing schemas via Mammoth
             mammoth.extractRawText({ arrayBuffer: arrayBuffer })
                 .then(function(result) {
                     const fullText = result.value; 
                     extractedClients = [];
                     
-                    // Split the raw text string block cleanly by line breaks
                     const lines = fullText.split('\n');
                     lines.forEach(line => {
                         parseLineData(line.trim());
@@ -272,12 +270,17 @@
         if (phoneMatch) {
             let phone = phoneMatch[0].trim();
             let nameMatch = lineStr.match(nameRegex) || lineStr.match(fallbackNameRegex);
-            let name = nameMatch ? nameMatch[1] || nameMatch[0] : "Client";
+            let name = "Client";
             
-            extractedClients.push({ name: name.trim(), phone: phone });
+            if (nameMatch && nameMatch[1]) {
+                name = nameMatch[1].trim();
+            } else if (nameMatch && nameMatch[0]) {
+                name = nameMatch[0].trim();
+            }
+            
+            extractedClients.push({ name: name, phone: phone });
         }
     }
 
     function finalizeExtraction() {
         if (extractedClients.length === 0) {
-            log("[WARNING] Zero phone number profiles matched or parsed.");
