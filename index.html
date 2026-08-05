@@ -3,161 +3,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multi-Doc Client Email Messenger</title>
-    <!-- Stable Client-Side Parsing Engines via CDN -->
-    <script src="https://cloudflare.com"></script>
-    <script src="https://cloudflare.com"></script>
+    <title>Excel Client Specific Email Dispatcher</title>
+    <!-- SheetJS CDN library for client-side Excel processing -->
+    <script src="https://jsdelivr.net"></script>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f7f9fa;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-        }
-        .app-container {
-            width: 640px;
-            background-color: #ffffff;
-            border: 1px solid #e1e4e6;
-            border-radius: 6px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            padding: 20px;
-            box-sizing: border-box;
-        }
-        h2 {
-            margin-top: 0;
-            font-size: 18px;
-            color: #333;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 10px;
-        }
-        fieldset {
-            border: 2px solid #e1e1e1;
-            border-radius: 6px;
-            padding: 15px;
-            margin-bottom: 15px;
-        }
-        legend {
-            font-weight: bold;
-            font-size: 14px;
-            padding: 0 5px;
-        }
-        .file-input-container {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .custom-file-upload {
-            display: inline-block;
-            background-color: #E1E1E1;
-            border: 1px solid #ccc;
-            padding: 8px 14px;
-            font-size: 13px;
-            cursor: pointer;
-            border-radius: 3px;
-            user-select: none;
-        }
-        .custom-file-upload:hover {
-            background-color: #d4d4d4;
-        }
-        .file-status {
-            font-size: 13px;
-            font-style: italic;
-            color: red;
-        }
-        .file-status.loaded {
-            color: green;
-            font-style: normal;
-            font-weight: bold;
-        }
-        .hint-text {
-            font-size: 13px;
-            color: #555555;
-            margin-bottom: 5px;
-        }
-        textarea {
-            width: 100%;
-            height: 90px;
-            font-family: 'Segoe UI', sans-serif;
-            font-size: 14px;
-            padding: 8px;
-            box-sizing: border-box;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            resize: none;
-        }
-        .btn-send {
-            width: 100%;
-            background-color: #2ECC71;
-            color: white;
-            border: none;
-            padding: 12px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            border-radius: 4px;
-            margin-bottom: 15px;
-            transition: background 0.2s;
-        }
-        .btn-send:hover {
-            background-color: #27ae60;
-        }
-        .log-box {
-            width: 100%;
-            height: 140px;
-            background-color: #F3F3F3;
-            font-family: 'Consolas', monospace;
-            font-size: 12px;
-            padding: 8px;
-            box-sizing: border-box;
-            border: 1px solid #ccc;
-            overflow-y: auto;
-            white-space: pre-wrap;
-        }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f7f9fa; margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .app-container { width: 640px; background-color: #ffffff; border: 1px solid #e1e4e6; border-radius: 6px; padding: 20px; box-sizing: border-box; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        h2 { margin-top: 0; font-size: 18px; color: #333; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        fieldset { border: 2px solid #e1e1e1; border-radius: 6px; padding: 15px; margin-bottom: 15px; }
+        legend { font-weight: bold; font-size: 14px; padding: 0 5px; }
+        .file-input-container { display: flex; align-items: center; gap: 10px; }
+        .custom-file-upload { display: inline-block; background-color: #E1E1E1; border: 1px solid #ccc; padding: 8px 14px; font-size: 13px; cursor: pointer; border-radius: 3px; }
+        .file-status { font-size: 13px; font-style: italic; color: red; }
+        .file-status.loaded { color: green; font-style: normal; font-weight: bold; }
+        textarea, input[type="text"] { width: 100%; font-size: 14px; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        textarea { height: 90px; resize: none; }
+        .btn-send { width: 100%; background-color: #2ECC71; color: white; border: none; padding: 12px; font-size: 16px; font-weight: bold; cursor: pointer; border-radius: 4px; margin-top: 10px; }
+        .btn-send:hover { background-color: #27ae60; }
+        .log-box { width: 100%; height: 140px; background-color: #F3F3F3; font-family: 'Consolas', monospace; font-size: 12px; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; overflow-y: auto; white-space: pre-wrap; }
     </style>
 </head>
 <body>
 
 <div class="app-container">
-    <h2>Multi-Doc Client Email Messenger</h2>
+    <h2>Client Certificate Excel Processing Module</h2>
 
-    <!-- 1. Document Upload Section -->
     <fieldset>
-        <legend> 1. Load Your Client Directory (PDF or Word DOCX) </legend>
+        <legend> 1. Load Client Directory Directory Spreadsheet (.xlsx) </legend>
         <div class="file-input-container">
-            <label for="docFile" class="custom-file-upload">Browse & Upload Document</label>
-            <input type="file" id="docFile" accept=".pdf, .docx, application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display: none;">
-            <span id="fileStatus" class="file-status">No file selected</span>
+            <label for="excelFile" class="custom-file-upload">Browse & Upload Excel Sheet</label>
+            <input type="file" id="excelFile" accept=".xlsx" style="display: none;">
+            <span id="fileStatus" class="file-status">No Excel file selected</span>
         </div>
     </fieldset>
 
-    <!-- 2. Message Template Editor Section -->
     <fieldset>
-        <legend> 2. Email Template Editor </legend>
-        <div class="hint-text">Use tags to inject data dynamically: {name} and {email}</div>
-        <textarea id="msgTemplate">Hello {name},&#10;Your certificate processing is complete. Sent to your verified address: {email}.</textarea>
+        <legend> 2. Email Header Subject Config </legend>
+        <input type="text" id="emailSubject" value="Your Verified Digital Performance Certificate Ready">
     </fieldset>
 
-    <!-- 3. Main Action Trigger Button -->
-    <button class="btn-send" id="btnSend">🚀 Execute Email Automation Blast</button>
-
-    <!-- 4. Interactive Live Logging Console -->
     <fieldset>
+        <legend> 3. Dynamic Individual Template Editor </legend>
+        <div style="font-size: 12px; color:#555; margin-bottom:5px;">Inject profile mapping values utilizing strings: {name}, {email}, and {certificate}</div>
+        <textarea id="msgTemplate">Hello {name},&#10;&#10;Your verified certificate ({certificate}) has been processed successfully. It has been routed to your target address: {email}.&#10;&#10;Best Regards.</textarea>
+    </fieldset>
+
+    <button class="btn-send" id="btnSend">🚀 Run Client-Specific Email Generation Loop</button>
+
+    <fieldset style="margin-top: 15px;">
         <legend> System Status Log Terminal </legend>
         <div class="log-box" id="logBox"></div>
     </fieldset>
 </div>
 
 <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cloudflare.com';
-
     let extractedClients = [];
-    const fileInput = document.getElementById('docFile');
+    const fileInput = document.getElementById('excelFile');
     const fileStatus = document.getElementById('fileStatus');
     const logBox = document.getElementById('logBox');
     const btnSend = document.getElementById('btnSend');
     const msgTemplate = document.getElementById('msgTemplate');
+    const emailSubject = document.getElementById('emailSubject');
 
     function log(message) {
         logBox.textContent += message + "\n";
@@ -165,117 +71,92 @@
     }
 
     fileInput.addEventListener('change', function(e) {
-        const files = e.target.files;
-        if (files && files.length > 0) {
-            fileStatus.textContent = files[0].name;
+        if (e.target.files.length > 0) {
+            const file = e.target.files[0];
+            fileStatus.textContent = file.name;
             fileStatus.className = "file-status loaded";
-            extractedClients = []; 
-            log(`[READY] Loaded file: ${files[0].name}`);
+            extractedClients = [];
+            log(`[READY] Excel sheet target selected: ${file.name}`);
         }
     });
 
-    btnSend.addEventListener('click', async function() {
-        const files = fileInput.files;
-        if (!files || files.length === 0) {
-            alert("Please upload a document first!");
+    btnSend.addEventListener('click', function() {
+        if (fileInput.files.length === 0) {
+            alert("Upload a valid client Excel sheet first!");
             return;
         }
-
-        const file = files[0];
-        const fileNameLower = file.name.toLowerCase();
-        log(`[PROCESSING] Scanning email records inside: ${file.name}...`);
         
-        if (fileNameLower.endsWith('.pdf')) {
-            processPDF(file);
-        } 
-        else if (fileNameLower.endsWith('.docx')) {
-            processWord(file);
-        } 
-        else {
-            log("[ERROR] Unsupported file extension format.");
-            alert("Please upload a valid .pdf or .docx file.");
-        }
-    });
-
-    // --- PDF Extractor Logic ---
-    function processPDF(file) {
-        const fileReader = new FileReader();
-        fileReader.onload = async function() {
-            try {
-                const typedarray = new Uint8Array(this.result);
-                const pdf = await pdfjsLib.getDocument(typedarray).promise;
-                extractedClients = [];
-                
-                for (let i = 1; i <= pdf.numPages; i++) {
-                    const page = await pdf.getPage(i);
-                    const textContent = await page.getTextContent();
-                    
-                    let lines = {};
-                    textContent.items.forEach(item => {
-                        let y = Math.round(item.transform[5]); 
-                        if (!lines[y]) lines[y] = [];
-                        lines[y].push(item.str);
-                    });
-
-                    let sortedY = Object.keys(lines).sort((a, b) => b - a);
-                    sortedY.forEach(y => {
-                        let lineStr = lines[y].join(" ").trim();
-                        parseLineData(lineStr);
-                    });
-                }
-                finalizeExtraction();
-            } catch (error) {
-                log(`[ERROR] PDF parsing failed: ${error.message}`);
-            }
-        };
-        fileReader.readAsArrayBuffer(file);
-    }
-
-    // --- Word DOCX Extractor Logic ---
-    function processWord(file) {
+        const file = fileInput.files[0];
+        log(`[SCANNING] Reading data matrix maps inside Excel structure...`);
+        
         const fileReader = new FileReader();
         fileReader.onload = function(e) {
-            const arrayBuffer = e.target.result;
-            
-            mammoth.extractRawText({ arrayBuffer: arrayBuffer })
-                .then(function(result) {
-                    const fullText = result.value; 
-                    extractedClients = [];
-                    
-                    const lines = fullText.split('\n');
-                    lines.forEach(line => {
-                        parseLineData(line.trim());
-                    });
-                    
-                    finalizeExtraction();
-                })
-                .catch(function(error) {
-                    log(`[ERROR] Word parsing failed: ${error.message}`);
-                    alert(`Word content extraction error: ${error.message}`);
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                
+                // Read from the first sheet tab
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                // Convert JSON array profiles
+                const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                extractedClients = [];
+
+                jsonData.forEach((row, i) => {
+                    // Normalize lookup columns keys to lowercase parameters
+                    let rowKeys = {};
+                    Object.keys(row).forEach(k => rowKeys[k.trim().toLowerCase()] = row[k]);
+
+                    let nameKey = Object.keys(rowKeys).find(k => k.includes('name'));
+                    let emailKey = Object.keys(rowKeys).find(k => k.includes('email') || k.includes('mail'));
+                    let certKey = Object.keys(rowKeys).find(k => k.includes('cert') || k.includes('file') || k.includes('path'));
+
+                    if (emailKey && rowKeys[emailKey]) {
+                        let email = String(rowKeys[emailKey]).trim();
+                        let name = nameKey ? String(rowKeys[nameKey]).trim() : "Client";
+                        let cert = certKey ? String(rowKeys[certKey]).trim() : "Certificate.pdf";
+                        
+                        // Extract just file name if it contains a full directory path string
+                        cert = cert.split(/[/\\]/).pop();
+
+                        if (email.includes('@')) {
+                            extractedClients.push({ name: name, email: email, certificate: cert });
+                        }
+                    }
                 });
+
+                executeTargetedBlast();
+            } catch (err) {
+                log(`[ERROR] SheetJS reading failure: ${err.message}`);
+            }
         };
         fileReader.readAsArrayBuffer(file);
+    });
+
+    function executeTargetedBlast() {
+        if (extractedClients.length === 0) {
+            log("[WARNING] No records matched. Ensure your Excel columns are named 'Name', 'Email', and 'Certificate'.");
+            alert("Spreadsheet mapping layout mismatched.");
+            return;
+        }
+        
+        log(`[SUCCESS] Extracted ${extractedClients.length} rows. Generating mail window panels sequential routing loops...`);
+        
+        const template = msgTemplate.value;
+        const subject = encodeURIComponent(emailSubject.value);
+
+        extractedClients.forEach((client, index) => {
+            let bodyText = template.replace(/{name}/g, client.name).replace(/{email}/g, client.email).replace(/{certificate}/g, client.certificate);
+            let mailtoUrl = `mailto:${client.email}?subject=${subject}&body=${encodeURIComponent(bodyText)}`;
+            
+            // Stagger consecutive window drafts slightly so the browser doesn't flag them as spam
+            setTimeout(() => {
+                log(`[OPENING DRAFT] Directing panel to specific user: ${client.name} -> (${client.email})`);
+                window.open(mailtoUrl, '_blank');
+            }, index * 1200);
+        });
     }
-
-    // --- Core Regex Email Extractor Engine ---
-    function parseLineData(lineStr) {
-        if (!lineStr) return;
-
-        // RFC 5322 Standard Email validation string matching parameters
-        const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g;
-        const nameRegex = /(?:Name:\s*)([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)+)/i;
-        const fallbackNameRegex = /^([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)+)/;
-
-        const emailMatch = lineStr.match(emailRegex);
-        if (emailMatch) {
-            let email = emailMatch[0].trim();
-            let nameMatch = lineStr.match(nameRegex) || lineStr.match(fallbackNameRegex);
-            let name = "Client";
-            
-            if (nameMatch) {
-                // If it captured the 'Name:' label sub-group, use that. Otherwise use whole string match
-                name = nameMatch[1] ? nameMatch[1].trim() : nameMatch[0].trim();
-            }
-            
-            // Clean up name variations if the regex accidentally captured the trailing email
-            if(name.toLowerCase().includes(email.toLowerCase())) {
+</script>
+</body>
+</html>
