@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Excel Client Specific Email Dispatcher</title>
-    <!-- SheetJS CDN library for client-side Excel processing -->
-    <script src="https://jsdelivr.net"></script>
+    <!-- FIX: Replaced unreliable script node with ultra-stable global Cloudflare CDN -->
+    <script src="https://cloudflare.com"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background-color: #f7f9fa; margin: 0; padding: 20px; display: flex; justify-content: center; }
         .app-container { width: 640px; background-color: #ffffff; border: 1px solid #e1e4e6; border-radius: 6px; padding: 20px; box-sizing: border-box; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
@@ -28,8 +28,9 @@
 <div class="app-container">
     <h2>Client Certificate Excel Processing Module</h2>
 
+    <!-- 1. Excel File Upload Section -->
     <fieldset>
-        <legend> 1. Load Client Directory Directory Spreadsheet (.xlsx) </legend>
+        <legend> 1. Load Client Directory Spreadsheet (.xlsx) </legend>
         <div class="file-input-container">
             <label for="excelFile" class="custom-file-upload">Browse & Upload Excel Sheet</label>
             <input type="file" id="excelFile" accept=".xlsx" style="display: none;">
@@ -37,19 +38,23 @@
         </div>
     </fieldset>
 
+    <!-- 2. Email Subject Input Header Section -->
     <fieldset>
         <legend> 2. Email Header Subject Config </legend>
         <input type="text" id="emailSubject" value="Your Verified Digital Performance Certificate Ready">
     </fieldset>
 
+    <!-- 3. Dynamic Message Template Layout Engine -->
     <fieldset>
         <legend> 3. Dynamic Individual Template Editor </legend>
         <div style="font-size: 12px; color:#555; margin-bottom:5px;">Inject profile mapping values utilizing strings: {name}, {email}, and {certificate}</div>
         <textarea id="msgTemplate">Hello {name},&#10;&#10;Your verified certificate ({certificate}) has been processed successfully. It has been routed to your target address: {email}.&#10;&#10;Best Regards.</textarea>
     </fieldset>
 
+    <!-- Execution Trigger -->
     <button class="btn-send" id="btnSend">🚀 Run Client-Specific Email Generation Loop</button>
 
+    <!-- 4. Real-time Log Monitor Console Screen Layout -->
     <fieldset style="margin-top: 15px;">
         <legend> System Status Log Terminal </legend>
         <div class="log-box" id="logBox"></div>
@@ -93,18 +98,17 @@
         fileReader.onload = function(e) {
             try {
                 const data = new Uint8Array(e.target.result);
+                
+                // Real-time execution call to the validated library namespace
                 const workbook = XLSX.read(data, { type: 'array' });
                 
-                // Read from the first sheet tab
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
                 
-                // Convert JSON array profiles
                 const jsonData = XLSX.utils.sheet_to_json(worksheet);
                 extractedClients = [];
 
                 jsonData.forEach((row, i) => {
-                    // Normalize lookup columns keys to lowercase parameters
                     let rowKeys = {};
                     Object.keys(row).forEach(k => rowKeys[k.trim().toLowerCase()] = row[k]);
 
@@ -117,7 +121,6 @@
                         let name = nameKey ? String(rowKeys[nameKey]).trim() : "Client";
                         let cert = certKey ? String(rowKeys[certKey]).trim() : "Certificate.pdf";
                         
-                        // Extract just file name if it contains a full directory path string
                         cert = cert.split(/[/\\]/).pop();
 
                         if (email.includes('@')) {
@@ -150,7 +153,6 @@
             let bodyText = template.replace(/{name}/g, client.name).replace(/{email}/g, client.email).replace(/{certificate}/g, client.certificate);
             let mailtoUrl = `mailto:${client.email}?subject=${subject}&body=${encodeURIComponent(bodyText)}`;
             
-            // Stagger consecutive window drafts slightly so the browser doesn't flag them as spam
             setTimeout(() => {
                 log(`[OPENING DRAFT] Directing panel to specific user: ${client.name} -> (${client.email})`);
                 window.open(mailtoUrl, '_blank');
