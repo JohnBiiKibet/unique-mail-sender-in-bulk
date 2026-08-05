@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PDF Client Certificate Messenger</title>
-    <!-- Load Mozilla's PDF.js Library via CDN to parse PDFs entirely client-side -->
-    <script src="https://cloudflare.com"></script>
+    <!-- Modern stable client-side parsing Engine -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -47,13 +47,19 @@
             align-items: center;
             gap: 10px;
         }
+        /* Fixed clickable label configuration bounds */
         .custom-file-upload {
+            display: inline-block;
             background-color: #E1E1E1;
             border: 1px solid #ccc;
-            padding: 6px 12px;
+            padding: 8px 14px;
             font-size: 13px;
             cursor: pointer;
             border-radius: 3px;
+            user-select: none;
+        }
+        .custom-file-upload:hover {
+            background-color: #d4d4d4;
         }
         .file-status {
             font-size: 13px;
@@ -109,9 +115,6 @@
             overflow-y: auto;
             white-space: pre-wrap;
         }
-        input[type="file"] {
-            display: none;
-        }
     </style>
 </head>
 <body>
@@ -123,15 +126,14 @@
     <fieldset>
         <legend> 1. Load Your Client Directory PDF </legend>
         <div class="file-input-container">
-            <label class="custom-file-upload">
-                <input type="file" id="pdfFile" accept=".pdf">
-                Browse & Upload PDF
-            </label>
+            <!-- Fixed explicitly linked trigger binding -->
+            <label for="pdfFile" class="custom-file-upload">Browse & Upload PDF</label>
+            <input type="file" id="pdfFile" accept="application/pdf" style="display: none;">
             <span id="fileStatus" class="file-status">No file selected</span>
         </div>
     </fieldset>
 
-    <!-- 2. Template Editor Section -->
+    <!-- 2. Message Template Editor Section -->
     <fieldset>
         <legend> 2. Message Template Editor </legend>
         <div class="hint-text">Use tags to inject data dynamically: {name} and {phone}</div>
@@ -149,8 +151,8 @@
 </div>
 
 <script>
-    // Initialize PDF.js worker reference explicitly
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cloudflare.com';
+    // Set explicit worker fallback engine properties
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
     let extractedClients = [];
     const fileInput = document.getElementById('pdfFile');
@@ -164,18 +166,17 @@
         logBox.scrollTop = logBox.scrollHeight;
     }
 
-    // File Selection Trigger handling logic
+    // Capture standard file object arrays correctly
     fileInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (file) {
             fileStatus.textContent = file.name;
             fileStatus.className = "file-status loaded";
-            extractedClients = []; // Flush buffer
+            extractedClients = []; 
             log(`[READY] Loaded PDF document: ${file.name}`);
         }
     });
 
-    // Core Processing & Pattern Matching Engine
     btnSend.addEventListener('click', async function() {
         const file = fileInput.files[0];
         if (!file) {
@@ -193,34 +194,33 @@
                 
                 extractedClients = [];
                 
-                // Read text metrics page by page
+                // Read and cycle content strings completely
                 for (let i = 1; i <= pdf.numPages; i++) {
                     const page = await pdf.getPage(i);
                     const textContent = await page.getTextContent();
                     
-                    // Reconstruct content line strings based on standard visual spacing
+                    // Reconstruct text blocks by structural lines
                     let lines = {};
                     textContent.items.forEach(item => {
-                        let y = Math.round(item.transform[5]); // visual row placement metric
+                        let y = Math.round(item.transform[5]); 
                         if (!lines[y]) lines[y] = [];
                         lines[y].push(item.str);
                     });
 
-                    // Sort lines from top visual frame bound downwards
                     let sortedY = Object.keys(lines).sort((a, b) => b - a);
                     
                     sortedY.forEach(y => {
                         let lineStr = lines[y].join(" ").trim();
                         if (!lineStr) return;
 
-                        // Unified RegEx evaluation checks
+                        // Robust extraction parameters
                         const phoneRegex = /(\+?\d{1,4}[-.\s]?\(?\d{1,3}?\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4})/;
                         const nameRegex = /(?:Name:\s*)([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)+)/i;
                         const fallbackNameRegex = /^([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)+)/;
 
                         const phoneMatch = lineStr.match(phoneRegex);
                         if (phoneMatch) {
-                            let phone = phoneMatch[1].trim();
+                            let phone = phoneMatch[0].trim();
                             let nameMatch = lineStr.match(nameRegex) || lineStr.match(fallbackNameRegex);
                             let name = nameMatch ? nameMatch[1].trim() : "Client";
                             
@@ -250,10 +250,9 @@
         const template = msgTemplate.value;
         
         extractedClients.forEach(client => {
-            // Replace our tags safely without throwing string format index errors
             let personalizedText = template.replace(/{name}/g, client.name).replace(/{phone}/g, client.phone);
             
-            // TODO: Hook your standard browser API endpoints or messaging system (e.g. Fetch/Axios API logs) right here.
+            // TODO: Append your preferred browser Fetch/Axios API communication integrations here.
             
             log(`[SENT] Message successfully blasted to: ${client.name} (${client.phone})`);
         });
